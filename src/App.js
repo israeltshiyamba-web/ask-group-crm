@@ -3,14 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 
 // ============================================================
 // ASK GROUP SARL — CRM DE SUIVI DES RENDEZ-VOUS CLIENTS
-// Connecté à la même base de données partagée que le RH/Compta
-// Agents : accès par code personnel (4 chiffres), voient leurs
-// propres clients uniquement. Admin : accès complet.
-//
-// DIRECTION ARTISTIQUE — « console de suivi d'appels »
-// Fond graphite + signal color par étape du pipeline, typo
-// technique (Space Grotesk / Inter / IBM Plex Mono pour les
-// téléphones), pipeline visualisé comme une ligne d'appel.
+// Direction artistique : "console de suivi d'appels", thème sombre,
+// accent bleu signal, pipeline visualisé comme une ligne d'appel.
 // ============================================================
 
 const SUPABASE_URL = "https://sfuuzluaysxrdcqtvuto.supabase.co";
@@ -18,24 +12,20 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ─── Tokens de design ────────────────────────────────────────
-const INK = "#14161C";       // fond console (sidebar, écrans de connexion)
-const SURFACE = "#1D2029";   // surfaces sur fond sombre
-const LINE = "#2A2E3A";      // séparateurs sur fond sombre
-const PAPER = "#F5F6F8";     // fond du contenu (clair)
-const CARD = "#FFFFFF";
-const BORDER = "#E2E5EA";
-const INK_SOFT = "#5A6072";
-const TEXT = "#1B1D24";
-
-const SIGNAL = "#FF5A36";    // signal principal (CTA, "live")
+const BG = "#0B0D12";
+const SURFACE = "#1D2029";
+const LINE = "rgba(255,255,255,.08)";
+const TEXT = "#F5F6F8";
+const TEXT_MUTED = "#7B8194";
+const SIGNAL = "#2D6CDF";
 const APP_NAME_ADMIN = "crm_admin";
 
 const STATUTS = [
-  { key: "confirme", label: "Confirmé", color: "#3E7CB1", bg: "#E8F1F9" },
-  { key: "documents", label: "Documents reçus", color: "#C4821E", bg: "#FBF0DE" },
-  { key: "programme", label: "Programmé installation", color: "#7A5FC7", bg: "#EFEAFB" },
-  { key: "installe", label: "Installé", color: "#0FA98F", bg: "#E2F7F3" },
-  { key: "annule", label: "Annulé / Perdu", color: "#C43D46", bg: "#FBE7E8" },
+  { key: "confirme", label: "Confirmé", color: "#2D6CDF", bg: "rgba(45,108,223,.14)" },
+  { key: "documents", label: "Documents reçus", color: "#C4821E", bg: "rgba(196,130,30,.14)" },
+  { key: "programme", label: "Programmé installation", color: "#7A5FC7", bg: "rgba(122,95,199,.14)" },
+  { key: "installe", label: "Installé", color: "#0FA98F", bg: "rgba(15,169,143,.14)" },
+  { key: "annule", label: "Annulé / Perdu", color: "#C43D46", bg: "rgba(196,61,70,.14)" },
 ];
 function statutInfo(key) { return STATUTS.find(s => s.key === key) || STATUTS[0]; }
 function statutIndex(key) { const i = STATUTS.findIndex(s => s.key === key); return i < 0 ? 0 : i; }
@@ -43,21 +33,172 @@ function statutIndex(key) { const i = STATUTS.findIndex(s => s.key === key); ret
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
-// ─── Polices ──────────────────────────────────────────────────
-const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');`;
-const FONT_DISPLAY = "'Space Grotesk', 'Inter', sans-serif";
+const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');`;
+const FONT_DISPLAY = "'Poppins', sans-serif";
 const FONT_BODY = "'Inter', 'Segoe UI', sans-serif";
 const FONT_MONO = "'IBM Plex Mono', monospace";
 
+const GLOBAL_CSS = `
+${FONT_IMPORT}
+.askg-page-frame { position:fixed; inset:8px; border-radius:22px; border:1px solid transparent; background: linear-gradient(90deg,#2D6CDF,#0FA98F,#7A5FC7,#2D6CDF) border-box; -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; background-size:300% 100%; animation: askgFrameFlow 8s linear infinite; opacity:.28; pointer-events:none; z-index:80; }
+@keyframes askgFrameFlow { to { background-position:300% 0; } }
+@keyframes askgFloat { 0%,100% { transform:translate(0,0) scale(1); } 50% { transform:translate(30px,-24px) scale(1.08); } }
+@keyframes askgWave { 0%,100% { height:8px; } 50% { height:42px; } }
+@keyframes askgPulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+@keyframes askgCardIn { from { opacity:0; transform:translateY(22px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes askgFadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+@keyframes askgSlideRight { from{opacity:0; transform:translateX(40px);} to{opacity:1; transform:translateX(0);} }
+@keyframes askgRowIn { from{opacity:0; transform:translateX(-10px);} to{opacity:1; transform:translateX(0);} }
+@keyframes askgRipple { to { transform:scale(3); opacity:0; } }
+@keyframes askgBounce { 0%{transform:scale(1);} 40%{transform:scale(1.16);} 100%{transform:scale(1);} }
+@keyframes askgFloaty { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-7px); } }
+@keyframes askgNodePulse { 0%,100%{box-shadow:0 0 0 4px rgba(15,169,143,.22);} 50%{box-shadow:0 0 0 7px rgba(15,169,143,.08);} }
+@keyframes askgLineFill { to { transform:scaleX(1); } }
+.askg-ripple { position:absolute; border-radius:50%; background:rgba(255,255,255,.5); transform:scale(0); animation: askgRipple .6s ease-out; pointer-events:none; }
+.askg-kpi:hover, .askg-client-card:hover { transform:translateY(-2px); border-color:rgba(45,108,223,.4) !important; }
+.askg-tbl-row:hover { background:rgba(45,108,223,.07) !important; }
+.askg-tbl th.sortable:hover { color:${TEXT} !important; }
+.askg-badge:active { transform:scale(.9); }
+.askg-btn:active { transform:scale(.96); }
+.askg-btn-primary:hover { box-shadow:0 14px 34px rgba(45,108,223,.5) !important; transform:translateY(-2px); }
+.askg-nav-item:hover { color:${TEXT} !important; }
+@media (max-width: 768px) {
+  .askg-shell { flex-direction: column !important; }
+  .askg-sidebar { width: 100% !important; padding: 12px 0 !important; }
+  .askg-sidebar-header { padding: 0 16px 12px !important; margin-bottom: 8px !important; }
+  .askg-sidebar-nav { display: flex !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; padding: 0 8px !important; }
+  .askg-sidebar-nav > div { white-space: nowrap !important; padding: 8px 14px !important; border-left: none !important; border-bottom: 3px solid transparent !important; }
+  .askg-main { padding: 14px !important; }
+  table { font-size: 11px !important; }
+  h1 { font-size: 18px !important; }
+}
+`;
+
+function ripple(e) {
+  const btn = e.currentTarget;
+  const circle = document.createElement('span');
+  circle.className = 'askg-ripple';
+  const rect = btn.getBoundingClientRect();
+  const size = 120;
+  circle.style.width = circle.style.height = size + 'px';
+  circle.style.left = (e.clientX - rect.left - size / 2) + 'px';
+  circle.style.top = (e.clientY - rect.top - size / 2) + 'px';
+  btn.appendChild(circle);
+  setTimeout(() => circle.remove(), 600);
+}
+
+// ============================================================
+// COMPOSANT — Illustration agente (casque, sans traits de visage)
+// ============================================================
+function AgentIllustration({ size = 220 }) {
+  return (
+    <div style={{ width: size, height: size, position: "relative" }}>
+      <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1px solid rgba(45,108,223,.3)", animation: "askgFloat 5s ease-in-out infinite" }} />
+      <svg viewBox="0 0 320 320" width={size} height={size}>
+        <path d="M20 250 Q10 140 70 60 Q140 -20 230 30 Q305 70 300 160 Q295 260 210 300 Q120 335 55 290 Q25 270 20 250 Z" fill={SURFACE} />
+        <path d="M104 314 Q104 240 190 240 Q276 240 276 314 Z" fill="#0FA98F" />
+        <path d="M128 254 L252 254 L240 314 L140 314 Z" fill="#0B7A65" />
+        <circle cx="140" cy="270" r="6" fill="#F5F6F8" opacity=".9" />
+        <circle cx="164" cy="286" r="6" fill="#F5F6F8" opacity=".9" />
+        <circle cx="140" cy="302" r="6" fill="#F5F6F8" opacity=".9" />
+        <g>
+          <circle cx="190" cy="150" r="90" fill="#241925" />
+          <circle cx="134" cy="118" r="30" fill="#241925" />
+          <circle cx="112" cy="148" r="27" fill="#241925" />
+          <circle cx="108" cy="184" r="24" fill="#241925" />
+          <circle cx="124" cy="214" r="20" fill="#241925" />
+          <circle cx="246" cy="118" r="30" fill="#241925" />
+          <circle cx="266" cy="148" r="27" fill="#241925" />
+          <circle cx="270" cy="184" r="24" fill="#241925" />
+          <circle cx="254" cy="214" r="20" fill="#241925" />
+          <circle cx="190" cy="84" r="35" fill="#241925" />
+          <circle cx="158" cy="92" r="26" fill="#2E2030" />
+          <circle cx="222" cy="92" r="26" fill="#2E2030" />
+        </g>
+        <ellipse cx="190" cy="158" rx="60" ry="64" fill="#8A5A3F" />
+        <circle cx="152" cy="150" r="14" fill="#8A5A3F" />
+        <circle cx="228" cy="150" r="14" fill="#8A5A3F" />
+        <path d="M114 148 Q108 90 190 82 Q272 90 266 148" fill="none" stroke={SIGNAL} strokeWidth="9" strokeLinecap="round" />
+        <circle cx="114" cy="158" r="17" fill={SIGNAL} />
+        <circle cx="266" cy="158" r="17" fill={SIGNAL} />
+        <path d="M266 172 Q280 190 266 204 L254 214" fill="none" stroke={SIGNAL} strokeWidth="7" strokeLinecap="round" />
+        <circle cx="252" cy="216" r="7.5" fill={SIGNAL} />
+        <ellipse cx="164" cy="152" rx="23" ry="19" fill="rgba(45,108,223,.12)" stroke="#12141A" strokeWidth="4" />
+        <ellipse cx="216" cy="152" rx="23" ry="19" fill="rgba(45,108,223,.12)" stroke="#12141A" strokeWidth="4" />
+        <path d="M187 150 Q190 146 193 150" fill="none" stroke="#12141A" strokeWidth="4" strokeLinecap="round" />
+        <path d="M141 148 Q128 146 120 152" fill="none" stroke="#12141A" strokeWidth="4" strokeLinecap="round" />
+        <path d="M239 148 Q252 146 260 152" fill="none" stroke="#12141A" strokeWidth="4" strokeLinecap="round" />
+      </svg>
+      <div style={{ position: "absolute", top: 2, right: 4, background: "#0FA98F", color: "white", width: 30, height: 30, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, boxShadow: "0 8px 20px rgba(15,169,143,.4)", animation: "askgFloaty 3.2s ease-in-out infinite" }}>✓</div>
+      <div style={{ position: "absolute", bottom: 18, left: -2, background: SURFACE, border: "1px solid " + LINE, width: 34, height: 34, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, boxShadow: "0 8px 20px rgba(0,0,0,.4)", animation: "askgFloaty 3.2s ease-in-out infinite 1s" }}>📞</div>
+    </div>
+  );
+}
+
+function EnergyIcons() {
+  return (
+    <div style={{ display: "flex", gap: 14, justifyContent: "center", marginTop: 22, opacity: .75 }}>
+      <svg width="46" height="46" viewBox="0 0 60 60" style={{ animation: "askgFloaty 3.6s ease-in-out infinite" }}><path d="M30 8 L52 26 L46 26 L46 50 L14 50 L14 26 L8 26 Z" fill="none" stroke={SIGNAL} strokeWidth="3" strokeLinejoin="round" /><rect x="24" y="26" width="16" height="5" rx="1.5" fill="#0FA98F" /><rect x="24" y="33" width="13" height="5" rx="1.5" fill="#C4821E" /><rect x="24" y="40" width="10" height="5" rx="1.5" fill="#C43D46" /></svg>
+      <svg width="46" height="46" viewBox="0 0 60 60" style={{ animation: "askgFloaty 3.6s ease-in-out infinite .5s" }}><rect x="8" y="16" width="30" height="22" rx="4" fill="none" stroke="#0FA98F" strokeWidth="3" /><circle cx="23" cy="27" r="8" fill="none" stroke="#0FA98F" strokeWidth="2.4" /><path d="M23 21 Q27 27 23 33 Q19 27 23 21" fill="#0FA98F" /><line x1="42" y1="27" x2="54" y2="27" stroke="#0FA98F" strokeWidth="3" strokeLinecap="round" /></svg>
+      <svg width="46" height="46" viewBox="0 0 60 60" style={{ animation: "askgFloaty 3.6s ease-in-out infinite 1s" }}><path d="M12 30 L30 14 L48 30 L48 50 L12 50 Z" fill="none" stroke="#7A5FC7" strokeWidth="3" strokeLinejoin="round" /><rect x="18" y="16" width="20" height="10" rx="1.5" fill="#7A5FC7" opacity=".8" transform="rotate(-32 30 21)" /><circle cx="47" cy="12" r="5" fill="#C4821E" /></svg>
+    </div>
+  );
+}
+
+function BgGlow({ opacity = 1 }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", opacity }}>
+      <div style={{ position: "absolute", width: 460, height: 460, borderRadius: "50%", filter: "blur(70px)", opacity: .3, background: SIGNAL, top: -140, left: -100, animation: "askgFloat 14s ease-in-out infinite" }} />
+      <div style={{ position: "absolute", width: 380, height: 380, borderRadius: "50%", filter: "blur(70px)", opacity: .3, background: "#7A5FC7", bottom: -110, right: -70, animation: "askgFloat 18s ease-in-out infinite -4s" }} />
+      <div style={{ position: "absolute", width: 280, height: 280, borderRadius: "50%", filter: "blur(70px)", opacity: .3, background: "#0FA98F", top: "40%", left: "60%", animation: "askgFloat 16s ease-in-out infinite -8s" }} />
+    </div>
+  );
+}
+
+function Waveform({ pos }) {
+  const bars = Array.from({ length: 36 });
+  return (
+    <div style={{ position: "absolute", left: 0, right: 0, [pos]: 0, height: 80, display: "flex", alignItems: pos === "top" ? "flex-start" : "flex-end", justifyContent: "center", gap: 4, opacity: .35, pointerEvents: "none" }}>
+      {bars.map((_, i) => (
+        <span key={i} style={{ width: 4, borderRadius: 4, background: pos === "top" ? "linear-gradient(0deg,#0FA98F,transparent)" : "linear-gradient(180deg,#2D6CDF,transparent)", height: 10 + Math.random() * 20, animation: `askgWave 1.4s ease-in-out infinite`, animationDelay: (Math.random() * 1.4) + "s" }} />
+      ))}
+    </div>
+  );
+}
+
+function SignalChain({ current }) {
+  const idx = statutIndex(current);
+  const isAnnule = current === "annule";
+  return (
+    <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+      {STATUTS.filter(s => s.key !== "annule").map((s, i) => {
+        const active = !isAnnule && i <= idx;
+        const isCurrent = !isAnnule && i === idx;
+        return (
+          <React.Fragment key={s.key}>
+            <span style={{
+              width: isCurrent ? 12 : 8, height: isCurrent ? 12 : 8, borderRadius: 99, flexShrink: 0,
+              background: active ? s.color : "#3A3E4C",
+              boxShadow: isCurrent ? `0 0 0 4px ${s.bg}` : "none",
+              animation: isCurrent ? "askgNodePulse 1.6s ease-in-out infinite" : "none",
+            }} />
+            {i < 3 && <div style={{ flex: 1, height: 2, margin: "0 4px", background: active && i < idx ? s.color : "#2A2E3A" }} />}
+          </React.Fragment>
+        );
+      })}
+      {isAnnule && <span style={{ marginLeft: 10, fontSize: 10, fontWeight: 700, color: statutInfo("annule").color, background: statutInfo("annule").bg, padding: "3px 8px", borderRadius: 6 }}>ANNULÉ</span>}
+    </div>
+  );
+}
+
 export default function App() {
-  const [mode, setMode] = useState(null); // null | "agent" | "admin"
+  const [mode, setMode] = useState(null);
   const [agents, setAgents] = useState([]);
   const [clients, setClients] = useState([]);
   const [codes, setCodes] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
-  // Session agent / admin
-  const [agentConnecte, setAgentConnecte] = useState(null); // { id, nom }
+  const [agentConnecte, setAgentConnecte] = useState(null);
   const [adminConnecte, setAdminConnecte] = useState(false);
   const [adminStoredPw, setAdminStoredPw] = useState(null);
   const [adminSetupMode, setAdminSetupMode] = useState(false);
@@ -103,7 +244,6 @@ export default function App() {
     setClients(prev => prev.filter(c => c.id !== id));
     await supabase.from("crm_clients").delete().eq("id", id);
   }
-
   async function setAgentCode(agentId, code) {
     const existing = codes.find(c => c.agentId === agentId);
     if (existing) {
@@ -114,7 +254,6 @@ export default function App() {
       await supabase.from("crm_agent_codes").insert({ agent_id: agentId, code });
     }
   }
-
   async function handleAdminSetup(pw) {
     await supabase.from("app_passwords").insert({ app_name: APP_NAME_ADMIN, password: pw });
     setAdminStoredPw(pw);
@@ -127,7 +266,6 @@ export default function App() {
     setAdminStoredPw(newPw);
     return true;
   }
-
   function handleAgentLogin(code) {
     const match = codes.find(c => c.code === code);
     if (!match) return false;
@@ -137,60 +275,31 @@ export default function App() {
     return true;
   }
 
-  if (!loaded) return <ConsoleLoading />;
+  if (!loaded) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: BG, fontFamily: FONT_BODY }}>
+        <style>{GLOBAL_CSS}</style>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, color: TEXT_MUTED }}>
+          <span style={{ width: 8, height: 8, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 12px ${SIGNAL}`, animation: "askgPulse 1.6s ease-in-out infinite" }} />
+          <span style={{ fontSize: 13 }}>Connexion à la ligne…</span>
+        </div>
+      </div>
+    );
+  }
 
   if (!mode) return <ChoixModeScreen onChoose={setMode} />;
-
   if (mode === "agent" && !agentConnecte) return <AgentLoginScreen onLogin={handleAgentLogin} onBack={() => setMode(null)} />;
-
   if (mode === "admin" && !adminConnecte) {
     if (adminSetupMode) return <AdminSetupScreen onSubmit={handleAdminSetup} onBack={() => setMode(null)} />;
     return <AdminLoginScreen storedPw={adminStoredPw} onLogin={() => setAdminConnecte(true)} onBack={() => setMode(null)} />;
   }
-
   if (mode === "agent" && agentConnecte) {
-    return (
-      <AgentApp
-        agent={agentConnecte}
-        clients={clients.filter(c => c.agentId === agentConnecte.id)}
-        addClient={addClient}
-        updateClient={updateClient}
-        onLogout={() => setAgentConnecte(null)}
-      />
-    );
+    return <AgentApp agent={agentConnecte} clients={clients.filter(c => c.agentId === agentConnecte.id)} addClient={addClient} updateClient={updateClient} onLogout={() => setAgentConnecte(null)} />;
   }
-
   if (mode === "admin" && adminConnecte) {
-    return (
-      <AdminApp
-        agents={agents}
-        clients={clients}
-        codes={codes}
-        setAgentCode={setAgentCode}
-        updateClient={updateClient}
-        removeClient={removeClient}
-        onChangePassword={handleChangeAdminPassword}
-        onLogout={() => setAdminConnecte(false)}
-      />
-    );
+    return <AdminApp agents={agents} clients={clients} codes={codes} setAgentCode={setAgentCode} updateClient={updateClient} removeClient={removeClient} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
   }
-
   return null;
-}
-
-// ============================================================
-// ÉCRAN DE CHARGEMENT
-// ============================================================
-function ConsoleLoading() {
-  return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: INK, fontFamily: FONT_BODY }}>
-      <style>{FONT_IMPORT}</style>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#8890A6" }}>
-        <span style={{ width: 8, height: 8, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 12px ${SIGNAL}` }} />
-        <span style={{ fontSize: 13 }}>Connexion à la ligne…</span>
-      </div>
-    </div>
-  );
 }
 
 // ============================================================
@@ -198,51 +307,62 @@ function ConsoleLoading() {
 // ============================================================
 function ChoixModeScreen({ onChoose }) {
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: INK, fontFamily: FONT_BODY, position: "relative", overflow: "hidden" }}>
-      <style>{FONT_IMPORT}</style>
-      <div style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(circle at 50% 0%, rgba(255,90,54,.14), transparent 55%)` }} />
-      <div style={{ position: "relative", background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 18, padding: 40, width: 380, textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.5)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginBottom: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 10px ${SIGNAL}` }} />
-          <div style={{ fontSize: 11, letterSpacing: 3, color: "#8890A6", fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: BG, fontFamily: FONT_BODY, position: "relative", overflow: "hidden" }}>
+      <style>{GLOBAL_CSS}</style>
+      <div className="askg-page-frame" />
+      <BgGlow />
+      <Waveform pos="top" />
+      <Waveform pos="bottom" />
+      <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", gap: 56, flexWrap: "wrap", padding: 20 }}>
+        <AgentIllustration size={230} />
+        <div style={{ background: "rgba(29,32,41,.92)", backdropFilter: "blur(20px)", border: `1px solid ${LINE}`, borderRadius: 20, padding: 40, width: 370, textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.5)", animation: "askgCardIn .7s cubic-bezier(.16,1,.3,1)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+            <span style={{ width: 7, height: 7, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 10px ${SIGNAL}`, animation: "askgPulse 1.6s ease-in-out infinite" }} />
+            <div style={{ fontSize: 11, letterSpacing: 3, color: TEXT_MUTED, fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
+          </div>
+          <h1 style={{ fontSize: 24, color: TEXT, margin: "8px 0 2px", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>Ligne Clients</h1>
+          <p style={{ fontSize: 12, color: TEXT_MUTED, margin: "0 0 26px" }}>Suivi des rendez-vous, en direct</p>
+          <button className="askg-btn askg-btn-primary" onClick={(e) => { ripple(e); onChoose("agent"); }} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 15, borderRadius: 12, fontWeight: 600, fontSize: 14.5, marginBottom: 10, cursor: "pointer", fontFamily: FONT_DISPLAY, boxShadow: "0 10px 28px rgba(45,108,223,.4)", position: "relative", overflow: "hidden" }}>Je suis un agent</button>
+          <button className="askg-btn" onClick={(e) => { ripple(e); onChoose("admin"); }} style={{ width: "100%", background: "transparent", color: "#C7CCDA", border: `1px solid ${LINE}`, padding: 15, borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: FONT_DISPLAY, position: "relative", overflow: "hidden" }}>Accès Direction</button>
         </div>
-        <h1 style={{ fontSize: 24, color: "#F5F6F8", margin: "6px 0 2px", fontFamily: FONT_DISPLAY, fontWeight: 700 }}>Ligne Clients</h1>
-        <p style={{ fontSize: 12, color: "#6B7284", margin: "0 0 28px" }}>Suivi des rendez-vous, en direct</p>
-        <button onClick={() => onChoose("agent")} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: "14px", borderRadius: 10, fontWeight: 700, fontSize: 14.5, marginBottom: 10, cursor: "pointer", fontFamily: FONT_DISPLAY, boxShadow: `0 8px 24px rgba(255,90,54,.35)` }}>Je suis un agent</button>
-        <button onClick={() => onChoose("admin")} style={{ width: "100%", background: "transparent", color: "#C7CCDA", border: `1px solid ${LINE}`, padding: "14px", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Accès Direction</button>
       </div>
     </div>
   );
 }
 
 // ============================================================
-// CONNEXION AGENT (code personnel)
+// CONNEXION AGENT / ADMIN
 // ============================================================
+function AuthShell({ children }) {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: BG, fontFamily: FONT_BODY, position: "relative", overflow: "hidden" }}>
+      <style>{GLOBAL_CSS}</style>
+      <div className="askg-page-frame" />
+      <BgGlow opacity={.6} />
+      {children}
+    </div>
+  );
+}
+
 function AgentLoginScreen({ onLogin, onBack }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
-  function submit() {
-    if (!onLogin(code)) setError("Code incorrect. Vérifie auprès de la Direction.");
-  }
+  function submit() { if (!onLogin(code)) setError("Code incorrect. Vérifie auprès de la Direction."); }
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: INK, fontFamily: FONT_BODY }}>
-      <style>{FONT_IMPORT}</style>
-      <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 18, padding: 36, width: 360, boxShadow: "0 30px 80px rgba(0,0,0,.5)" }}>
-        <div style={{ fontSize: 11, letterSpacing: 3, color: "#8890A6", fontWeight: 600, textAlign: "center", fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
-        <h1 style={{ fontSize: 19, textAlign: "center", color: "#F5F6F8", margin: "10px 0 22px", fontFamily: FONT_DISPLAY, fontWeight: 700 }}>Connexion Agent</h1>
+    <AuthShell>
+      <div style={{ position: "relative", background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 20, padding: 36, width: 360, boxShadow: "0 30px 80px rgba(0,0,0,.5)", animation: "askgCardIn .7s cubic-bezier(.16,1,.3,1)" }}>
+        <div style={{ fontSize: 11, letterSpacing: 3, color: TEXT_MUTED, fontWeight: 600, textAlign: "center", fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
+        <h1 style={{ fontSize: 19, textAlign: "center", color: TEXT, margin: "10px 0 22px", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>Connexion Agent</h1>
         <label style={darkLabelStyle}>Ton code personnel</label>
         <input type="password" inputMode="numeric" maxLength={4} value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={{ ...darkInputStyle, textAlign: "center", fontSize: 26, letterSpacing: 10, fontFamily: FONT_MONO }} placeholder="••••" autoFocus />
         {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
-        <button onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 700, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Se connecter</button>
-        <button onClick={onBack} style={{ width: "100%", background: "none", color: "#6B7284", border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
+        <button className="askg-btn" onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Se connecter</button>
+        <button onClick={onBack} style={{ width: "100%", background: "none", color: TEXT_MUTED, border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
-// ============================================================
-// CONNEXION / CRÉATION ADMIN
-// ============================================================
 function AdminSetupScreen({ onSubmit, onBack }) {
   const [pw, setPw] = useState(""); const [pw2, setPw2] = useState(""); const [error, setError] = useState("");
   function submit() {
@@ -251,74 +371,38 @@ function AdminSetupScreen({ onSubmit, onBack }) {
     onSubmit(pw);
   }
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: INK, fontFamily: FONT_BODY }}>
-      <style>{FONT_IMPORT}</style>
-      <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 18, padding: 36, width: 380, boxShadow: "0 30px 80px rgba(0,0,0,.5)" }}>
-        <div style={{ fontSize: 11, letterSpacing: 3, color: "#8890A6", fontWeight: 600, textAlign: "center", fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
-        <h1 style={{ fontSize: 19, textAlign: "center", color: "#F5F6F8", margin: "10px 0 4px", fontFamily: FONT_DISPLAY, fontWeight: 700 }}>Première utilisation Direction</h1>
-        <p style={{ fontSize: 12.5, color: "#6B7284", textAlign: "center", marginBottom: 22 }}>Crée le mot de passe Admin. Tu seras le seul à le connaître.</p>
+    <AuthShell>
+      <div style={{ position: "relative", background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 20, padding: 36, width: 380, boxShadow: "0 30px 80px rgba(0,0,0,.5)", animation: "askgCardIn .7s cubic-bezier(.16,1,.3,1)" }}>
+        <div style={{ fontSize: 11, letterSpacing: 3, color: TEXT_MUTED, fontWeight: 600, textAlign: "center", fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
+        <h1 style={{ fontSize: 19, textAlign: "center", color: TEXT, margin: "10px 0 4px", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>Première utilisation Direction</h1>
+        <p style={{ fontSize: 12.5, color: TEXT_MUTED, textAlign: "center", marginBottom: 22 }}>Crée le mot de passe Admin. Tu seras le seul à le connaître.</p>
         <label style={darkLabelStyle}>Nouveau mot de passe</label>
         <input type="password" value={pw} onChange={e => setPw(e.target.value)} style={darkInputStyle} placeholder="Au moins 4 caractères" />
         <label style={{ ...darkLabelStyle, marginTop: 12 }}>Confirme le mot de passe</label>
         <input type="password" value={pw2} onChange={e => setPw2(e.target.value)} style={darkInputStyle} />
         {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
-        <button onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 700, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Créer mon accès Admin</button>
-        <button onClick={onBack} style={{ width: "100%", background: "none", color: "#6B7284", border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
+        <button className="askg-btn" onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Créer mon accès Admin</button>
+        <button onClick={onBack} style={{ width: "100%", background: "none", color: TEXT_MUTED, border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
 function AdminLoginScreen({ storedPw, onLogin, onBack }) {
   const [pw, setPw] = useState(""); const [error, setError] = useState("");
-  function submit() {
-    if (pw === storedPw) onLogin();
-    else setError("Mot de passe incorrect.");
-  }
+  function submit() { if (pw === storedPw) onLogin(); else setError("Mot de passe incorrect."); }
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: INK, fontFamily: FONT_BODY }}>
-      <style>{FONT_IMPORT}</style>
-      <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 18, padding: 36, width: 360, boxShadow: "0 30px 80px rgba(0,0,0,.5)" }}>
-        <div style={{ fontSize: 11, letterSpacing: 3, color: "#8890A6", fontWeight: 600, textAlign: "center", fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
-        <h1 style={{ fontSize: 19, textAlign: "center", color: "#F5F6F8", margin: "10px 0 22px", fontFamily: FONT_DISPLAY, fontWeight: 700 }}>Accès Direction</h1>
+    <AuthShell>
+      <div style={{ position: "relative", background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 20, padding: 36, width: 360, boxShadow: "0 30px 80px rgba(0,0,0,.5)", animation: "askgCardIn .7s cubic-bezier(.16,1,.3,1)" }}>
+        <div style={{ fontSize: 11, letterSpacing: 3, color: TEXT_MUTED, fontWeight: 600, textAlign: "center", fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
+        <h1 style={{ fontSize: 19, textAlign: "center", color: TEXT, margin: "10px 0 22px", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>Accès Direction</h1>
         <label style={darkLabelStyle}>Mot de passe</label>
         <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={darkInputStyle} autoFocus />
         {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
-        <button onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 700, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Déverrouiller</button>
-        <button onClick={onBack} style={{ width: "100%", background: "none", color: "#6B7284", border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
+        <button className="askg-btn" onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Déverrouiller</button>
+        <button onClick={onBack} style={{ width: "100%", background: "none", color: TEXT_MUTED, border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
       </div>
-    </div>
-  );
-}
-
-// ============================================================
-// LIGNE DE SIGNAL — visualisation du pipeline (élément signature)
-// ============================================================
-function SignalChain({ current, compact }) {
-  const idx = statutIndex(current);
-  const isAnnule = current === "annule";
-  return (
-    <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
-      {STATUTS.filter(s => s.key !== "annule").map((s, i) => {
-        const active = !isAnnule && i <= idx;
-        const isCurrent = !isAnnule && i === idx;
-        return (
-          <React.Fragment key={s.key}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-              <span style={{
-                width: isCurrent ? 12 : 8, height: isCurrent ? 12 : 8, borderRadius: 99,
-                background: active ? s.color : "#DADEE6",
-                boxShadow: isCurrent ? `0 0 0 4px ${s.bg}` : "none",
-                transition: "all .2s",
-              }} />
-              {!compact && <span style={{ fontSize: 9, color: active ? s.color : "#A6ABB8", fontWeight: 600, marginTop: 5, textAlign: "center", maxWidth: 58, lineHeight: 1.15 }}>{s.label}</span>}
-            </div>
-            {i < 3 && <div style={{ flex: 1, height: 2, background: active && i < idx ? s.color : "#DADEE6", margin: compact ? "0 3px" : "0 4px 16px" }} />}
-          </React.Fragment>
-        );
-      })}
-      {isAnnule && <span style={{ marginLeft: 10, fontSize: 10, fontWeight: 700, color: statutInfo("annule").color, background: statutInfo("annule").bg, padding: "3px 8px", borderRadius: 6 }}>ANNULÉ</span>}
-    </div>
+    </AuthShell>
   );
 }
 
@@ -341,30 +425,36 @@ function AgentApp({ agent, clients, addClient, updateClient, onLogout }) {
     setEditingId(c.id);
   }
   function cancelEdit() { setEditingId(null); setForm(emptyForm); }
+  function bounceBadge(e) {
+    const el = e.currentTarget;
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "askgBounce .4s ease";
+  }
 
   const counts = {};
   STATUTS.forEach(s => { counts[s.key] = clients.filter(c => c.statut === s.key).length; });
 
   return (
-    <div style={{ minHeight: "100vh", background: PAPER, fontFamily: FONT_BODY }}>
-      <style>{FONT_IMPORT}{RESPONSIVE_CSS}</style>
-      <div style={{ background: INK, color: "white", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+    <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT_BODY }}>
+      <style>{GLOBAL_CSS}</style>
+      <div style={{ background: SURFACE, color: TEXT, padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, borderBottom: `1px solid ${LINE}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: SIGNAL, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 15 }}>{agent.nom.charAt(0)}</div>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: SIGNAL, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 15 }}>{agent.nom.charAt(0)}</div>
           <div>
-            <div style={{ fontSize: 10, letterSpacing: 2, color: "#8890A6", fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP — LIGNE CLIENTS</div>
-            <div style={{ fontSize: 17, fontWeight: 700, fontFamily: FONT_DISPLAY }}>{agent.nom}</div>
+            <div style={{ fontSize: 10, letterSpacing: 2, color: TEXT_MUTED, fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP — LIGNE CLIENTS</div>
+            <div style={{ fontSize: 17, fontWeight: 600, fontFamily: FONT_DISPLAY }}>{agent.nom}</div>
           </div>
         </div>
-        <button onClick={onLogout} style={{ background: "rgba(255,255,255,.08)", color: "white", border: `1px solid ${LINE}`, padding: "9px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Déconnexion</button>
+        <button onClick={onLogout} style={{ background: "rgba(255,255,255,.06)", color: TEXT, border: `1px solid ${LINE}`, padding: "9px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Déconnexion</button>
       </div>
 
       <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
-          {STATUTS.map(s => (
-            <div key={s.key} style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14, borderTop: `3px solid ${s.color}` }}>
-              <div style={{ fontSize: 9.5, color: INK_SOFT, textTransform: "uppercase", fontWeight: 700, letterSpacing: .3 }}>{s.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, marginTop: 5, color: s.color, fontFamily: FONT_DISPLAY }}>{counts[s.key]}</div>
+          {STATUTS.map((s, i) => (
+            <div key={s.key} className="askg-kpi" style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 12, padding: 14, borderTop: `3px solid ${s.color}`, transition: "all .2s ease", animation: "askgFadeUp .5s ease forwards", animationDelay: (i * .06) + "s", opacity: 0 }}>
+              <div style={{ fontSize: 9.5, color: TEXT_MUTED, textTransform: "uppercase", fontWeight: 700, letterSpacing: .3 }}>{s.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 600, marginTop: 5, color: s.color, fontFamily: FONT_DISPLAY }}>{counts[s.key]}</div>
             </div>
           ))}
         </div>
@@ -377,39 +467,41 @@ function AgentApp({ agent, clients, addClient, updateClient, onLogout }) {
             <Field label="Produit / Service"><input type="text" value={form.produit} onChange={e => setForm({ ...form, produit: e.target.value })} style={{ ...inputStyle, width: 170 }} /></Field>
             <Field label="Date RDV"><input type="date" value={form.dateRdv} onChange={e => setForm({ ...form, dateRdv: e.target.value })} style={inputStyle} /></Field>
             <Field label="Notes"><input type="text" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} style={{ ...inputStyle, width: 180 }} /></Field>
-            <button onClick={submit} style={primaryBtnStyle}>{editingId ? "Enregistrer" : "+ Ajouter"}</button>
-            {editingId && <button onClick={cancelEdit} style={ghostBtnStyle}>Annuler</button>}
+            <button className="askg-btn" onClick={submit} style={primaryBtnStyle}>{editingId ? "Enregistrer" : "+ Ajouter"}</button>
+            {editingId && <button className="askg-btn" onClick={cancelEdit} style={ghostBtnStyle}>Annuler</button>}
           </div>
         </Panel>
 
         <Panel title={`Mes clients (${clients.length})`}>
           {clients.length === 0 ? <EmptyState text="Aucun client enregistré pour l'instant." /> : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {clients.map(c => (
-                <div key={c.id} style={{ border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14, background: CARD }}>
+              {clients.map((c, i) => (
+                <div key={c.id} className="askg-client-card" style={{ border: `1px solid ${LINE}`, borderRadius: 12, padding: 14, background: SURFACE, transition: "all .2s ease", animation: "askgFadeUp .4s ease forwards", animationDelay: Math.min(i * .05, .3) + "s", opacity: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: TEXT, fontFamily: FONT_DISPLAY }}>{c.nomClient}</div>
-                      <div style={{ fontSize: 12, color: INK_SOFT, marginTop: 2, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <div style={{ fontWeight: 600, fontSize: 15, color: TEXT, fontFamily: FONT_DISPLAY }}>{c.nomClient}</div>
+                      <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 2, display: "flex", gap: 10, flexWrap: "wrap" }}>
                         <span style={{ fontFamily: FONT_MONO }}>{c.telephone}</span>
                         {c.produit && <span>· {c.produit}</span>}
                         {c.dateRdv && <span>· {new Date(c.dateRdv).toLocaleDateString("fr-FR")}</span>}
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <select value={c.statut} onChange={e => updateClient(c.id, { statut: e.target.value })} style={{ ...inputStyle, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color, fontWeight: 700, border: "none" }}>
-                        {STATUTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                      <select className="askg-badge" onClick={bounceBadge} value={c.statut} onChange={e => updateClient(c.id, { statut: e.target.value })} style={{ ...inputStyle, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color, fontWeight: 700, border: "none" }}>
+                        {STATUTS.map(s => <option key={s.key} value={s.key} style={{ background: SURFACE, color: TEXT }}>{s.label}</option>)}
                       </select>
-                      <button onClick={() => startEdit(c)} style={editBtnStyle}>Modifier</button>
+                      <button className="askg-btn" onClick={() => startEdit(c)} style={editBtnStyle}>Modifier</button>
                     </div>
                   </div>
                   <SignalChain current={c.statut} />
-                  {c.notes && <div style={{ fontSize: 12, color: INK_SOFT, marginTop: 10, fontStyle: "italic" }}>{c.notes}</div>}
+                  {c.notes && <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 10, fontStyle: "italic" }}>{c.notes}</div>}
                 </div>
               ))}
             </div>
           )}
         </Panel>
+
+        <EnergyIcons />
       </div>
     </div>
   );
@@ -421,23 +513,23 @@ function AgentApp({ agent, clients, addClient, updateClient, onLogout }) {
 function AdminApp({ agents, clients, codes, setAgentCode, updateClient, removeClient, onChangePassword, onLogout }) {
   const [page, setPage] = useState("dashboard");
   return (
-    <div className="askg-shell" style={{ display: "flex", minHeight: "100vh", fontFamily: FONT_BODY, background: PAPER }}>
-      <style>{FONT_IMPORT}{RESPONSIVE_CSS}</style>
-      <div className="askg-sidebar" style={{ width: 236, background: INK, color: "white", padding: "24px 0", flexShrink: 0 }}>
+    <div className="askg-shell" style={{ display: "flex", minHeight: "100vh", fontFamily: FONT_BODY, background: BG }}>
+      <style>{GLOBAL_CSS}</style>
+      <div className="askg-sidebar" style={{ width: 236, background: SURFACE, color: TEXT, padding: "24px 0", flexShrink: 0, borderRight: `1px solid ${LINE}` }}>
         <div className="askg-sidebar-header" style={{ padding: "0 24px 20px", borderBottom: `1px solid ${LINE}`, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ width: 7, height: 7, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 10px ${SIGNAL}` }} />
+          <span style={{ width: 7, height: 7, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 10px ${SIGNAL}`, animation: "askgPulse 1.6s ease-in-out infinite" }} />
           <div>
-            <div style={{ fontSize: 10, letterSpacing: 2, color: "#8890A6", fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP</div>
-            <div style={{ fontSize: 17, fontWeight: 700, fontFamily: FONT_DISPLAY }}>CRM — Direction</div>
+            <div style={{ fontSize: 10, letterSpacing: 2, color: TEXT_MUTED, fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP</div>
+            <div style={{ fontSize: 17, fontWeight: 600, fontFamily: FONT_DISPLAY }}>CRM — Direction</div>
           </div>
         </div>
         <div className="askg-sidebar-nav">
           {[["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["codes", "Codes agents"], ["parametres", "Paramètres"]].map(([k, l]) => (
-            <div key={k} onClick={() => setPage(k)} style={{ padding: "12px 24px", fontSize: 13, cursor: "pointer", borderLeft: page === k ? `3px solid ${SIGNAL}` : "3px solid transparent", background: page === k ? "rgba(255,90,54,.1)" : "transparent", color: page === k ? "#FFB39F" : "#9096A6", fontWeight: page === k ? 700 : 500 }}>{l}</div>
+            <div key={k} className="askg-nav-item" onClick={() => setPage(k)} style={{ padding: "12px 24px", fontSize: 13, cursor: "pointer", borderLeft: page === k ? `3px solid ${SIGNAL}` : "3px solid transparent", background: page === k ? "rgba(45,108,223,.12)" : "transparent", color: page === k ? "#9CC0FF" : TEXT_MUTED, fontWeight: page === k ? 700 : 500, transition: "color .2s ease" }}>{l}</div>
           ))}
         </div>
-        <div className="askg-sidebar-footer" style={{ margin: "20px 24px 0" }}>
-          <button onClick={onLogout} style={{ width: "100%", background: "rgba(255,255,255,.06)", color: "#C7CCDA", border: `1px solid ${LINE}`, padding: 10, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Verrouiller</button>
+        <div style={{ margin: "20px 24px 0" }}>
+          <button onClick={onLogout} style={{ width: "100%", background: "rgba(255,255,255,.05)", color: "#C7CCDA", border: `1px solid ${LINE}`, padding: 10, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Verrouiller</button>
         </div>
       </div>
       <div className="askg-main" style={{ flex: 1, padding: "28px 36px", overflowX: "auto" }}>
@@ -460,31 +552,30 @@ function DashboardPage({ agents, clients }) {
     <>
       <PageHeader title="Tableau de bord" subtitle="Vue d'ensemble de tous les agents, en direct" />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 22 }}>
-        {STATUTS.map(s => (
-          <div key={s.key} style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 16px", borderTop: `3px solid ${s.color}` }}>
-            <div style={{ fontSize: 9.5, color: INK_SOFT, textTransform: "uppercase", fontWeight: 700, letterSpacing: .3 }}>{s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, marginTop: 5, color: s.color, fontFamily: FONT_DISPLAY }}>{counts[s.key]}</div>
+        {STATUTS.map((s, i) => (
+          <div key={s.key} className="askg-kpi" style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 12, padding: "14px 16px", borderTop: `3px solid ${s.color}`, transition: "all .2s ease", animation: "askgFadeUp .5s ease forwards", animationDelay: (i * .06) + "s", opacity: 0 }}>
+            <div style={{ fontSize: 9.5, color: TEXT_MUTED, textTransform: "uppercase", fontWeight: 700, letterSpacing: .3 }}>{s.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 600, marginTop: 5, color: s.color, fontFamily: FONT_DISPLAY }}>{counts[s.key]}</div>
           </div>
         ))}
       </div>
-      <Panel title="Ligne de pipeline globale" accent>
-        <SignalChain current={STATUTS[Math.min(3, Math.round((counts.confirme*0+counts.documents*1+counts.programme*2+counts.installe*3)/Math.max(1,(counts.confirme+counts.documents+counts.programme+counts.installe))))].key} />
-        <div style={{ fontSize: 11, color: INK_SOFT, marginTop: 14 }}>Position moyenne de l'ensemble des dossiers actifs dans le pipeline.</div>
-      </Panel>
       <Panel title="Performance par agent">
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
           <thead><tr><Th>Agent</Th><Th>Total clients</Th><Th>Installés</Th></tr></thead>
-          <tbody>{parAgent.map(a => (<tr key={a.nom}><Td><b>{a.nom}</b></Td><Td>{a.total}</Td><Td style={{ color: statutInfo("installe").color }}><b>{a.installes}</b></Td></tr>))}</tbody>
+          <tbody>{parAgent.map(a => (<tr key={a.nom} className="askg-tbl-row" style={{ transition: "background .2s ease" }}><Td><b>{a.nom}</b></Td><Td>{a.total}</Td><Td style={{ color: statutInfo("installe").color }}><b>{a.installes}</b></Td></tr>))}</tbody>
         </table>
       </Panel>
       <Panel title="Derniers clients ajoutés">
         {clients.length === 0 ? <EmptyState text="Aucun client enregistré." /> : (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
             <thead><tr><Th>Client</Th><Th>Agent</Th><Th>Statut</Th></tr></thead>
-            <tbody>{clients.slice(0, 8).map(c => (<tr key={c.id}><Td><b>{c.nomClient}</b></Td><Td>{nomAgent(c.agentId)}</Td><Td><StatutBadge value={c.statut} /></Td></tr>))}</tbody>
+            <tbody>{clients.slice(0, 8).map((c, i) => (<tr key={c.id} className="askg-tbl-row" style={{ transition: "background .2s ease", animation: "askgRowIn .4s ease forwards", animationDelay: (i * .05) + "s", opacity: 0 }}><Td><b>{c.nomClient}</b></Td><Td>{nomAgent(c.agentId)}</Td><Td><StatutBadge value={c.statut} /></Td></tr>))}</tbody>
           </table>
         )}
       </Panel>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <svg width="60" height="60" viewBox="0 0 60 60" style={{ opacity: .45, animation: "askgFloaty 4s ease-in-out infinite" }}><rect x="8" y="16" width="30" height="22" rx="4" fill="none" stroke={SIGNAL} strokeWidth="3" /><circle cx="23" cy="27" r="8" fill="none" stroke={SIGNAL} strokeWidth="2.4" /><path d="M23 21 Q27 27 23 33 Q19 27 23 21" fill={SIGNAL} /><line x1="42" y1="27" x2="54" y2="27" stroke={SIGNAL} strokeWidth="3" strokeLinecap="round" /></svg>
+      </div>
     </>
   );
 }
@@ -493,7 +584,6 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
   const [filtreAgent, setFiltreAgent] = useState("tous");
   const [filtreStatut, setFiltreStatut] = useState("tous");
   function nomAgent(id) { const a = agents.find(x => x.id === id); return a ? a.nom : "?"; }
-
   const filtres = clients.filter(c => (filtreAgent === "tous" || c.agentId === filtreAgent) && (filtreStatut === "tous" || c.statut === filtreStatut));
 
   return (
@@ -518,11 +608,11 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
       <Panel title={`Clients (${filtres.length})`}>
         {filtres.length === 0 ? <EmptyState text="Aucun client ne correspond à ces filtres." /> : (
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+            <table className="askg-tbl" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
               <thead><tr><Th>Client</Th><Th>Agent</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Date RDV</Th><Th>Statut</Th><Th>Notes</Th><Th></Th></tr></thead>
               <tbody>
-                {filtres.map(c => (
-                  <tr key={c.id}>
+                {filtres.map((c, i) => (
+                  <tr key={c.id} className="askg-tbl-row" style={{ transition: "background .2s ease", animation: "askgRowIn .4s ease forwards", animationDelay: Math.min(i * .04, .3) + "s", opacity: 0 }}>
                     <Td><b>{c.nomClient}</b></Td>
                     <Td>{nomAgent(c.agentId)}</Td>
                     <Td style={{ fontFamily: FONT_MONO }}>{c.telephone}</Td>
@@ -530,11 +620,11 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
                     <Td>{c.dateRdv ? new Date(c.dateRdv).toLocaleDateString("fr-FR") : "—"}</Td>
                     <Td>
                       <select value={c.statut} onChange={e => updateClient(c.id, { statut: e.target.value })} style={{ ...inputStyle, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color, fontWeight: 700 }}>
-                        {STATUTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                        {STATUTS.map(s => <option key={s.key} value={s.key} style={{ background: SURFACE, color: TEXT }}>{s.label}</option>)}
                       </select>
                     </Td>
                     <Td style={{ maxWidth: 160 }}>{c.notes}</Td>
-                    <Td><button onClick={() => removeClient(c.id)} style={delBtnStyle}>Suppr.</button></Td>
+                    <Td><button className="askg-btn" onClick={() => removeClient(c.id)} style={delBtnStyle}>Suppr.</button></Td>
                   </tr>
                 ))}
               </tbody>
@@ -563,17 +653,17 @@ function CodesAgentsPage({ agents, codes, setAgentCode }) {
           <thead><tr><Th>Agent</Th><Th>Code actuel</Th><Th>Nouveau code</Th><Th></Th></tr></thead>
           <tbody>
             {agents.map(a => (
-              <tr key={a.id}>
+              <tr key={a.id} className="askg-tbl-row" style={{ transition: "background .2s ease" }}>
                 <Td><b>{a.nom}</b></Td>
-                <Td>{codeActuel(a.id) ? <b style={{ letterSpacing: 3, fontFamily: FONT_MONO }}>{codeActuel(a.id)}</b> : <span style={{ color: "#A6ABB8" }}>Aucun code défini</span>}</Td>
+                <Td>{codeActuel(a.id) ? <b style={{ letterSpacing: 3, fontFamily: FONT_MONO }}>{codeActuel(a.id)}</b> : <span style={{ color: TEXT_MUTED }}>Aucun code défini</span>}</Td>
                 <Td><input type="text" maxLength={4} value={edits[a.id] || ""} onChange={e => setEdits(prev => ({ ...prev, [a.id]: e.target.value.replace(/\D/g, "") }))} placeholder="0000" style={{ ...inputStyle, width: 70, textAlign: "center", letterSpacing: 3, fontFamily: FONT_MONO }} /></Td>
-                <Td><button onClick={() => submit(a.id)} style={editBtnStyle}>{codeActuel(a.id) ? "Modifier" : "Créer"}</button></Td>
+                <Td><button className="askg-btn" onClick={() => submit(a.id)} style={editBtnStyle}>{codeActuel(a.id) ? "Modifier" : "Créer"}</button></Td>
               </tr>
             ))}
           </tbody>
         </table>
       </Panel>
-      <div style={{ fontSize: 11, color: INK_SOFT }}>Communique le code à chaque agent individuellement, en privé.</div>
+      <div style={{ fontSize: 11, color: TEXT_MUTED }}>Communique le code à chaque agent individuellement, en privé.</div>
     </>
   );
 }
@@ -593,13 +683,13 @@ function ParametresPage({ onChangePassword }) {
       <Panel title="Changer le mot de passe Admin">
         <div style={{ maxWidth: 320 }}>
           <label style={labelStyle}>Mot de passe actuel</label>
-          <input type="password" value={oldPw} onChange={e => setOldPw(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 10, background: "white", color: TEXT }} />
+          <input type="password" value={oldPw} onChange={e => setOldPw(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 10 }} />
           <label style={labelStyle}>Nouveau mot de passe</label>
-          <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 10, background: "white", color: TEXT }} />
+          <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 10 }} />
           <label style={labelStyle}>Confirme le nouveau mot de passe</label>
-          <input type="password" value={newPw2} onChange={e => setNewPw2(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 14, background: "white", color: TEXT }} />
-          {msg && <div style={{ fontSize: 12, color: msg.startsWith("✓") ? statutInfo("installe").color : "#C43D46", marginBottom: 10 }}>{msg}</div>}
-          <button onClick={submit} style={primaryBtnStyle}>Modifier le mot de passe</button>
+          <input type="password" value={newPw2} onChange={e => setNewPw2(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 14 }} />
+          {msg && <div style={{ fontSize: 12, color: msg.startsWith("✓") ? statutInfo("installe").color : "#E0656B", marginBottom: 10 }}>{msg}</div>}
+          <button className="askg-btn" onClick={submit} style={primaryBtnStyle}>Modifier le mot de passe</button>
         </div>
       </Panel>
     </>
@@ -607,57 +697,40 @@ function ParametresPage({ onChangePassword }) {
 }
 
 // ============================================================
-// STYLE RESPONSIVE (mobile / iPhone)
-// ============================================================
-const RESPONSIVE_CSS = `
-@media (max-width: 768px) {
-  .askg-shell { flex-direction: column !important; }
-  .askg-sidebar { width: 100% !important; padding: 12px 0 !important; }
-  .askg-sidebar-header { padding: 0 16px 12px !important; margin-bottom: 8px !important; }
-  .askg-sidebar-nav { display: flex !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; padding: 0 8px !important; }
-  .askg-sidebar-nav > div { white-space: nowrap !important; padding: 8px 14px !important; border-left: none !important; border-bottom: 3px solid transparent !important; }
-  .askg-sidebar-footer { margin: 8px 16px 0 !important; }
-  .askg-main { padding: 14px !important; }
-  table { font-size: 11px !important; }
-  h1 { font-size: 18px !important; }
-}
-`;
-
-// ============================================================
 // COMPOSANTS UTILITAIRES
 // ============================================================
 function PageHeader({ title, subtitle }) {
   return (
     <div style={{ marginBottom: 22 }}>
-      <h1 style={{ fontSize: 23, margin: 0, fontWeight: 700, color: TEXT, fontFamily: FONT_DISPLAY }}>{title}</h1>
-      <div style={{ fontSize: 12.5, color: INK_SOFT, marginTop: 4 }}>{subtitle}</div>
+      <h1 style={{ fontSize: 23, margin: 0, fontWeight: 600, color: TEXT, fontFamily: FONT_DISPLAY }}>{title}</h1>
+      <div style={{ fontSize: 12.5, color: TEXT_MUTED, marginTop: 4 }}>{subtitle}</div>
     </div>
   );
 }
 function Panel({ title, children, accent }) {
   return (
-    <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, marginBottom: 18, overflow: "hidden" }}>
-      <div style={{ padding: "15px 20px", borderBottom: `1px solid ${BORDER}`, borderLeft: accent ? `3px solid ${SIGNAL}` : "none", display: "flex", alignItems: "center", gap: 8 }}>
-        <h2 style={{ fontSize: 13.5, margin: 0, fontWeight: 700, color: TEXT, fontFamily: FONT_DISPLAY }}>{title}</h2>
+    <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 14, marginBottom: 18, overflow: "hidden" }}>
+      <div style={{ padding: "15px 20px", borderBottom: `1px solid ${LINE}`, borderLeft: accent ? `3px solid ${SIGNAL}` : "none", display: "flex", alignItems: "center", gap: 8 }}>
+        <h2 style={{ fontSize: 13.5, margin: 0, fontWeight: 600, color: TEXT, fontFamily: FONT_DISPLAY }}>{title}</h2>
       </div>
       <div style={{ padding: 18 }}>{children}</div>
     </div>
   );
 }
 function Field({ label, children }) { return <div><label style={labelStyle}>{label}</label>{children}</div>; }
-function Th({ children }) { return <th style={{ textAlign: "left", padding: "8px 10px", background: "#FAFBFC", color: INK_SOFT, fontWeight: 700, fontSize: 9.5, textTransform: "uppercase", letterSpacing: .3, borderBottom: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>{children}</th>; }
-function Td({ children, style }) { return <td style={{ padding: "9px 10px", borderBottom: `1px solid ${BORDER}`, color: TEXT, ...style }}>{children}</td>; }
+function Th({ children }) { return <th className="sortable" style={{ textAlign: "left", padding: "8px 10px", background: "rgba(255,255,255,.02)", color: TEXT_MUTED, fontWeight: 700, fontSize: 9.5, textTransform: "uppercase", letterSpacing: .3, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", cursor: "default", transition: "color .2s ease" }}>{children}</th>; }
+function Td({ children, style }) { return <td style={{ padding: "9px 10px", borderBottom: `1px solid ${LINE}`, color: TEXT, ...style }}>{children}</td>; }
 function StatutBadge({ value }) {
   const s = statutInfo(value);
   return <span style={{ padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, color: s.color, background: s.bg }}>{s.label}</span>;
 }
-function EmptyState({ text }) { return <div style={{ textAlign: "center", padding: "30px 10px", color: "#A6ABB8", fontSize: 13 }}>{text}</div>; }
+function EmptyState({ text }) { return <div style={{ textAlign: "center", padding: "30px 10px", color: TEXT_MUTED, fontSize: 13 }}>{text}</div>; }
 
-const inputStyle = { border: `1px solid ${BORDER}`, borderRadius: 7, padding: "8px 10px", fontSize: 12, background: "#F0F3FF", color: "#2A4FA0", fontWeight: 600, fontFamily: FONT_BODY };
-const darkInputStyle = { width: "100%", border: `1px solid ${LINE}`, borderRadius: 9, padding: "11px 13px", fontSize: 14, marginTop: 4, boxSizing: "border-box", background: "#12141A", color: "#F5F6F8" };
-const labelStyle = { display: "block", fontSize: 11, fontWeight: 700, color: INK_SOFT, marginBottom: 5 };
-const darkLabelStyle = { display: "block", fontSize: 11, fontWeight: 600, color: "#8890A6", marginBottom: 5 };
+const inputStyle = { border: `1px solid ${LINE}`, borderRadius: 7, padding: "8px 10px", fontSize: 12, background: "rgba(45,108,223,.1)", color: "#9CC0FF", fontWeight: 600, fontFamily: FONT_BODY };
+const darkInputStyle = { width: "100%", border: `1px solid ${LINE}`, borderRadius: 9, padding: "11px 13px", fontSize: 14, marginTop: 4, boxSizing: "border-box", background: "#12141A", color: TEXT };
+const labelStyle = { display: "block", fontSize: 11, fontWeight: 700, color: TEXT_MUTED, marginBottom: 5 };
+const darkLabelStyle = { display: "block", fontSize: 11, fontWeight: 600, color: TEXT_MUTED, marginBottom: 5 };
 const delBtnStyle = { background: statutInfo("annule").bg, color: statutInfo("annule").color, border: "none", padding: "5px 10px", borderRadius: 7, fontSize: 10.5, fontWeight: 700, cursor: "pointer" };
-const editBtnStyle = { background: "#F0F3FF", color: "#2A4FA0", border: "none", padding: "5px 10px", borderRadius: 7, fontSize: 10.5, fontWeight: 700, cursor: "pointer" };
-const primaryBtnStyle = { background: SIGNAL, color: "white", border: "none", padding: "10px 20px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 12.5, fontFamily: FONT_DISPLAY };
-const ghostBtnStyle = { background: "#EEF0F4", color: INK_SOFT, border: "none", padding: "10px 20px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 12.5 };
+const editBtnStyle = { background: "rgba(45,108,223,.12)", color: "#9CC0FF", border: "none", padding: "5px 10px", borderRadius: 7, fontSize: 10.5, fontWeight: 700, cursor: "pointer" };
+const primaryBtnStyle = { background: SIGNAL, color: "white", border: "none", padding: "10px 20px", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 12.5, fontFamily: FONT_DISPLAY };
+const ghostBtnStyle = { background: "rgba(255,255,255,.06)", color: TEXT_MUTED, border: `1px solid ${LINE}`, padding: "10px 20px", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 12.5 };
