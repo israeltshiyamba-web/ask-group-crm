@@ -212,7 +212,7 @@ export default function App() {
         supabase.from("app_passwords").select("*").eq("app_name", APP_NAME_ADMIN).maybeSingle(),
       ]);
       if (a.data) setAgents(a.data);
-      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv })));
+      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, configurationMaison: x.configuration_maison })));
       if (cd.data) setCodes(cd.data.map(x => ({ ...x, agentId: x.agent_id })));
       if (pw.data) setAdminStoredPw(pw.data.password);
       else setAdminSetupMode(true);
@@ -224,9 +224,9 @@ export default function App() {
   }, []);
 
   async function addClient(form) {
-    const newRow = { id: uid(), agentId: agentConnecte.id, nomClient: form.nomClient, telephone: form.telephone, adresse: form.adresse, produit: form.produit, dateRdv: form.dateRdv, statut: "confirme", notes: form.notes, created_at: new Date().toISOString() };
+    const newRow = { id: uid(), agentId: agentConnecte.id, nomClient: form.nomClient, telephone: form.telephone, adresse: form.adresse, produit: form.produit, dateRdv: form.dateRdv, statut: "confirme", notes: form.notes, configurationMaison: form.configurationMaison, created_at: new Date().toISOString() };
     setClients(prev => [newRow, ...prev]);
-    await supabase.from("crm_clients").insert({ id: newRow.id, agent_id: newRow.agentId, nom_client: newRow.nomClient, telephone: newRow.telephone, adresse: newRow.adresse, produit: newRow.produit, date_rdv: newRow.dateRdv || null, statut: "confirme", notes: newRow.notes });
+    await supabase.from("crm_clients").insert({ id: newRow.id, agent_id: newRow.agentId, nom_client: newRow.nomClient, telephone: newRow.telephone, adresse: newRow.adresse, produit: newRow.produit, date_rdv: newRow.dateRdv || null, statut: "confirme", notes: newRow.notes, configuration_maison: newRow.configurationMaison });
   }
   async function updateClient(id, updates) {
     setClients(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
@@ -238,6 +238,9 @@ export default function App() {
     if ("dateRdv" in updates) dbUpdates.date_rdv = updates.dateRdv || null;
     if ("statut" in updates) dbUpdates.statut = updates.statut;
     if ("notes" in updates) dbUpdates.notes = updates.notes;
+    if ("configurationMaison" in updates) dbUpdates.configuration_maison = updates.configurationMaison;
+    if ("raisonAnnulation" in updates) dbUpdates.raison_annulation = updates.raisonAnnulation;
+    if ("rappelDate" in updates) dbUpdates.rappel_date = updates.rappelDate || null;
     await supabase.from("crm_clients").update(dbUpdates).eq("id", id);
   }
   async function removeClient(id) {
@@ -294,7 +297,7 @@ export default function App() {
     return <AdminLoginScreen storedPw={adminStoredPw} onLogin={() => setAdminConnecte(true)} onBack={() => setMode(null)} />;
   }
   if (mode === "agent" && agentConnecte) {
-    return <AgentApp agent={agentConnecte} clients={clients.filter(c => c.agentId === agentConnecte.id)} addClient={addClient} updateClient={updateClient} onLogout={() => setAgentConnecte(null)} />;
+    return <AgentApp agent={agentConnecte} clients={clients.filter(c => c.agentId === agentConnecte.id)} allClients={clients} agents={agents} addClient={addClient} updateClient={updateClient} onLogout={() => setAgentConnecte(null)} />;
   }
   if (mode === "admin" && adminConnecte) {
     return <AdminApp agents={agents} clients={clients} codes={codes} setAgentCode={setAgentCode} updateClient={updateClient} removeClient={removeClient} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
@@ -306,6 +309,7 @@ export default function App() {
 // ÉCRAN DE CHOIX INITIAL
 // ============================================================
 function ChoixModeScreen({ onChoose }) {
+  const [hover, setHover] = useState("agent");
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: BG, fontFamily: FONT_BODY, position: "relative", overflow: "hidden" }}>
       <style>{GLOBAL_CSS}</style>
@@ -320,10 +324,33 @@ function ChoixModeScreen({ onChoose }) {
             <span style={{ width: 7, height: 7, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 10px ${SIGNAL}`, animation: "askgPulse 1.6s ease-in-out infinite" }} />
             <div style={{ fontSize: 11, letterSpacing: 3, color: TEXT_MUTED, fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
           </div>
-          <h1 style={{ fontSize: 24, color: TEXT, margin: "8px 0 2px", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>Ligne Clients</h1>
+          <h1 style={{ fontSize: 24, color: TEXT, margin: "8px 0 2px", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>CRM Ask Group</h1>
           <p style={{ fontSize: 12, color: TEXT_MUTED, margin: "0 0 26px" }}>Suivi des rendez-vous, en direct</p>
-          <button className="askg-btn askg-btn-primary" onClick={(e) => { ripple(e); onChoose("agent"); }} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 15, borderRadius: 12, fontWeight: 600, fontSize: 14.5, marginBottom: 10, cursor: "pointer", fontFamily: FONT_DISPLAY, boxShadow: "0 10px 28px rgba(45,108,223,.4)", position: "relative", overflow: "hidden" }}>Je suis un agent</button>
-          <button className="askg-btn" onClick={(e) => { ripple(e); onChoose("admin"); }} style={{ width: "100%", background: "transparent", color: "#C7CCDA", border: `1px solid ${LINE}`, padding: 15, borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: FONT_DISPLAY, position: "relative", overflow: "hidden" }}>Accès Direction</button>
+          <button
+            className="askg-btn"
+            onMouseEnter={() => setHover("agent")}
+            onClick={(e) => { ripple(e); onChoose("agent"); }}
+            style={{
+              width: "100%", border: "none", padding: 15, borderRadius: 12, fontWeight: 600, fontSize: 14.5, marginBottom: 10, cursor: "pointer", fontFamily: FONT_DISPLAY, position: "relative", overflow: "hidden",
+              background: hover === "agent" ? SIGNAL : "transparent",
+              color: hover === "agent" ? "white" : "#C7CCDA",
+              boxShadow: hover === "agent" ? "0 10px 28px rgba(45,108,223,.4)" : "none",
+              transition: "background .25s ease, color .25s ease, box-shadow .25s ease",
+            }}
+          >Je suis un agent</button>
+          <button
+            className="askg-btn"
+            onMouseEnter={() => setHover("admin")}
+            onClick={(e) => { ripple(e); onChoose("admin"); }}
+            style={{
+              width: "100%", padding: 15, borderRadius: 12, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: FONT_DISPLAY, position: "relative", overflow: "hidden",
+              background: hover === "admin" ? SIGNAL : "transparent",
+              color: hover === "admin" ? "white" : "#C7CCDA",
+              border: hover === "admin" ? "none" : `1px solid ${LINE}`,
+              boxShadow: hover === "admin" ? "0 10px 28px rgba(45,108,223,.4)" : "none",
+              transition: "background .25s ease, color .25s ease, box-shadow .25s ease, border-color .25s ease",
+            }}
+          >Accès Direction</button>
         </div>
       </div>
     </div>
@@ -409,10 +436,11 @@ function AdminLoginScreen({ storedPw, onLogin, onBack }) {
 // ============================================================
 // APPLICATION AGENT
 // ============================================================
-function AgentApp({ agent, clients, addClient, updateClient, onLogout }) {
-  const emptyForm = { nomClient: "", telephone: "", adresse: "", produit: "", dateRdv: todayISO(), notes: "" };
+function AgentApp({ agent, clients, allClients, agents, addClient, updateClient, onLogout }) {
+  const emptyForm = { nomClient: "", telephone: "", adresse: "", produit: "", dateRdv: todayISO(), notes: "", configurationMaison: "" };
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
+  const [vue, setVue] = useState("perso");
 
   function submit() {
     if (!form.nomClient || !form.telephone) return;
@@ -421,7 +449,7 @@ function AgentApp({ agent, clients, addClient, updateClient, onLogout }) {
     setForm(emptyForm);
   }
   function startEdit(c) {
-    setForm({ nomClient: c.nomClient, telephone: c.telephone, adresse: c.adresse || "", produit: c.produit || "", dateRdv: c.dateRdv || todayISO(), notes: c.notes || "" });
+    setForm({ nomClient: c.nomClient, telephone: c.telephone, adresse: c.adresse || "", produit: c.produit || "", dateRdv: c.dateRdv || todayISO(), notes: c.notes || "", configurationMaison: c.configurationMaison || "" });
     setEditingId(c.id);
   }
   function cancelEdit() { setEditingId(null); setForm(emptyForm); }
@@ -442,14 +470,24 @@ function AgentApp({ agent, clients, addClient, updateClient, onLogout }) {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 38, height: 38, borderRadius: 10, background: SIGNAL, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 15 }}>{agent.nom.charAt(0)}</div>
           <div>
-            <div style={{ fontSize: 10, letterSpacing: 2, color: TEXT_MUTED, fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP — LIGNE CLIENTS</div>
+            <div style={{ fontSize: 10, letterSpacing: 2, color: TEXT_MUTED, fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP — CRM</div>
             <div style={{ fontSize: 17, fontWeight: 600, fontFamily: FONT_DISPLAY }}>{agent.nom}</div>
           </div>
         </div>
-        <button onClick={onLogout} style={{ background: "rgba(255,255,255,.06)", color: TEXT, border: `1px solid ${LINE}`, padding: "9px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Déconnexion</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", background: "rgba(255,255,255,.05)", borderRadius: 99, padding: 4, border: `1px solid ${LINE}` }}>
+            <button onClick={() => setVue("perso")} style={{ border: "none", borderRadius: 99, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: vue === "perso" ? SIGNAL : "transparent", color: vue === "perso" ? "white" : TEXT_MUTED, transition: "all .2s ease" }}>Mon espace</button>
+            <button onClick={() => setVue("collectif")} style={{ border: "none", borderRadius: 99, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: vue === "collectif" ? SIGNAL : "transparent", color: vue === "collectif" ? "white" : TEXT_MUTED, transition: "all .2s ease" }}>Espace collectif</button>
+          </div>
+          <button onClick={onLogout} style={{ background: "rgba(255,255,255,.06)", color: TEXT, border: `1px solid ${LINE}`, padding: "9px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Déconnexion</button>
+        </div>
       </div>
 
       <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
+        {vue === "collectif" ? (
+          <EspaceCollectif agents={agents} allClients={allClients} agentActuelId={agent.id} />
+        ) : (
+        <>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
           {STATUTS.map((s, i) => (
             <div key={s.key} className="askg-kpi" style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 12, padding: 14, borderTop: `3px solid ${s.color}`, transition: "all .2s ease", animation: "askgFadeUp .5s ease forwards", animationDelay: (i * .06) + "s", opacity: 0 }}>
@@ -466,6 +504,7 @@ function AgentApp({ agent, clients, addClient, updateClient, onLogout }) {
             <Field label="Adresse"><input type="text" value={form.adresse} onChange={e => setForm({ ...form, adresse: e.target.value })} style={{ ...inputStyle, width: 180 }} /></Field>
             <Field label="Produit / Service"><input type="text" value={form.produit} onChange={e => setForm({ ...form, produit: e.target.value })} style={{ ...inputStyle, width: 170 }} /></Field>
             <Field label="Date RDV"><input type="date" value={form.dateRdv} onChange={e => setForm({ ...form, dateRdv: e.target.value })} style={inputStyle} /></Field>
+            <Field label="Configuration de la maison"><input type="text" value={form.configurationMaison} onChange={e => setForm({ ...form, configurationMaison: e.target.value })} style={{ ...inputStyle, width: 220 }} /></Field>
             <Field label="Notes"><input type="text" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} style={{ ...inputStyle, width: 180 }} /></Field>
             <button className="askg-btn" onClick={submit} style={primaryBtnStyle}>{editingId ? "Enregistrer" : "+ Ajouter"}</button>
             {editingId && <button className="askg-btn" onClick={cancelEdit} style={ghostBtnStyle}>Annuler</button>}
@@ -494,7 +533,18 @@ function AgentApp({ agent, clients, addClient, updateClient, onLogout }) {
                     </div>
                   </div>
                   <SignalChain current={c.statut} />
-                  {c.notes && <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 10, fontStyle: "italic" }}>{c.notes}</div>}
+                  {c.configurationMaison && <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 10 }}><b style={{ color: TEXT }}>Configuration maison :</b> {c.configurationMaison}</div>}
+                  {c.notes && <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 6, fontStyle: "italic" }}>{c.notes}</div>}
+                  {c.rappelDate && (
+                    <div style={{ fontSize: 12, color: "#C4821E", marginTop: 10, background: "rgba(196,130,30,.1)", border: "1px solid rgba(196,130,30,.25)", borderRadius: 8, padding: "6px 10px" }}>
+                      📞 À rappeler le {new Date(c.rappelDate).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
+                    </div>
+                  )}
+                  {c.statut === "annule" && c.raisonAnnulation && (
+                    <div style={{ fontSize: 12, color: "#E0656B", marginTop: 10, background: "rgba(196,61,70,.1)", border: "1px solid rgba(196,61,70,.25)", borderRadius: 8, padding: "6px 10px" }}>
+                      Raison (Direction) : {c.raisonAnnulation}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -502,8 +552,47 @@ function AgentApp({ agent, clients, addClient, updateClient, onLogout }) {
         </Panel>
 
         <EnergyIcons />
+        </>
+        )}
       </div>
     </div>
+  );
+}
+
+// ============================================================
+// ESPACE COLLECTIF — vue lecture seule des statistiques de toute l'équipe
+// ============================================================
+function EspaceCollectif({ agents, allClients, agentActuelId }) {
+  return (
+    <>
+      <PageHeader title="Espace collectif" subtitle="Suivi en direct de toute l'équipe — lecture seule" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+        {agents.map((a, ai) => {
+          const clientsAgent = allClients.filter(c => c.agentId === a.id);
+          const isMe = a.id === agentActuelId;
+          return (
+            <div key={a.id} style={{ background: SURFACE, border: `1px solid ${isMe ? SIGNAL : LINE}`, borderRadius: 14, padding: 16, animation: "askgFadeUp .4s ease forwards", animationDelay: (ai * .06) + "s", opacity: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: isMe ? SIGNAL : "rgba(255,255,255,.08)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 12 }}>{a.nom.charAt(0)}</div>
+                <div style={{ fontWeight: 600, fontFamily: FONT_DISPLAY, color: TEXT, fontSize: 14 }}>{a.nom}{isMe && <span style={{ color: SIGNAL, fontSize: 10, fontWeight: 700 }}> · toi</span>}</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {STATUTS.map(s => (
+                  <div key={s.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
+                    <span style={{ color: TEXT_MUTED }}>{s.label}</span>
+                    <span style={{ fontWeight: 700, color: s.color, fontFamily: FONT_DISPLAY }}>{clientsAgent.filter(c => c.statut === s.key).length}</span>
+                  </div>
+                ))}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, marginTop: 6, paddingTop: 8, borderTop: `1px solid ${LINE}` }}>
+                  <span style={{ color: TEXT, fontWeight: 700 }}>Total</span>
+                  <span style={{ fontWeight: 700, color: TEXT, fontFamily: FONT_DISPLAY }}>{clientsAgent.length}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -609,7 +698,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
         {filtres.length === 0 ? <EmptyState text="Aucun client ne correspond à ces filtres." /> : (
           <div style={{ overflowX: "auto" }}>
             <table className="askg-tbl" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-              <thead><tr><Th>Client</Th><Th>Agent</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Date RDV</Th><Th>Statut</Th><Th>Notes</Th><Th></Th></tr></thead>
+              <thead><tr><Th>Client</Th><Th>Agent</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Date RDV</Th><Th>Statut</Th><Th>À rappeler</Th><Th>Raison (si annulé)</Th><Th>Notes</Th><Th></Th></tr></thead>
               <tbody>
                 {filtres.map((c, i) => (
                   <tr key={c.id} className="askg-tbl-row" style={{ transition: "background .2s ease", animation: "askgRowIn .4s ease forwards", animationDelay: Math.min(i * .04, .3) + "s", opacity: 0 }}>
@@ -622,6 +711,12 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
                       <select value={c.statut} onChange={e => updateClient(c.id, { statut: e.target.value })} style={{ ...inputStyle, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color, fontWeight: 700 }}>
                         {STATUTS.map(s => <option key={s.key} value={s.key} style={{ background: SURFACE, color: TEXT }}>{s.label}</option>)}
                       </select>
+                    </Td>
+                    <Td>
+                      <input type="datetime-local" defaultValue={c.rappelDate ? c.rappelDate.slice(0, 16) : ""} onBlur={e => updateClient(c.id, { rappelDate: e.target.value ? new Date(e.target.value).toISOString() : null })} style={{ ...inputStyle, width: 150 }} />
+                    </Td>
+                    <Td>
+                      <input type="text" defaultValue={c.raisonAnnulation || ""} placeholder={c.statut === "annule" ? "Pourquoi perdu..." : "—"} disabled={c.statut !== "annule"} onBlur={e => updateClient(c.id, { raisonAnnulation: e.target.value })} style={{ ...inputStyle, width: 150, opacity: c.statut === "annule" ? 1 : .4, background: "white", color: TEXT, fontWeight: 400 }} />
                     </Td>
                     <Td style={{ maxWidth: 160 }}>{c.notes}</Td>
                     <Td><button className="askg-btn" onClick={() => removeClient(c.id)} style={delBtnStyle}>Suppr.</button></Td>
