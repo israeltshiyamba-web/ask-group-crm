@@ -21,14 +21,16 @@ const SIGNAL = "#2D6CDF";
 const APP_NAME_ADMIN = "crm_admin";
 
 const STATUTS = [
+  { key: "nouveau", label: "Nouveau rendez-vous à traiter", color: "#8890A6", bg: "rgba(136,144,166,.14)" },
   { key: "confirme", label: "Confirmé", color: "#2D6CDF", bg: "rgba(45,108,223,.14)" },
   { key: "documents", label: "Documents reçus", color: "#C4821E", bg: "rgba(196,130,30,.14)" },
   { key: "programme", label: "Programmé installation", color: "#7A5FC7", bg: "rgba(122,95,199,.14)" },
   { key: "installe", label: "Installé", color: "#0FA98F", bg: "rgba(15,169,143,.14)" },
+  { key: "rappeler", label: "À rappeler", color: "#4FB8D9", bg: "rgba(79,184,217,.14)" },
   { key: "annule", label: "Annulé / Perdu", color: "#C43D46", bg: "rgba(196,61,70,.14)" },
 ];
 function statutInfo(key) { return STATUTS.find(s => s.key === key) || STATUTS[0]; }
-function statutIndex(key) { const i = STATUTS.findIndex(s => s.key === key); return i < 0 ? 0 : i; }
+const STATUTS_CHAINE = STATUTS.filter(s => s.key !== "annule" && s.key !== "rappeler");
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
@@ -167,13 +169,13 @@ function Waveform({ pos }) {
 }
 
 function SignalChain({ current }) {
-  const idx = statutIndex(current);
-  const isAnnule = current === "annule";
+  const isBranch = current === "annule" || current === "rappeler";
+  const idx = isBranch ? STATUTS_CHAINE.length - 1 : STATUTS_CHAINE.findIndex(s => s.key === current);
   return (
     <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
-      {STATUTS.filter(s => s.key !== "annule").map((s, i) => {
-        const active = !isAnnule && i <= idx;
-        const isCurrent = !isAnnule && i === idx;
+      {STATUTS_CHAINE.map((s, i) => {
+        const active = !isBranch && i <= idx;
+        const isCurrent = !isBranch && i === idx;
         return (
           <React.Fragment key={s.key}>
             <span style={{
@@ -182,11 +184,11 @@ function SignalChain({ current }) {
               boxShadow: isCurrent ? `0 0 0 4px ${s.bg}` : "none",
               animation: isCurrent ? "askgNodePulse 1.6s ease-in-out infinite" : "none",
             }} />
-            {i < 3 && <div style={{ flex: 1, height: 2, margin: "0 4px", background: active && i < idx ? s.color : "#2A2E3A" }} />}
+            {i < STATUTS_CHAINE.length - 1 && <div style={{ flex: 1, height: 2, margin: "0 4px", background: active && i < idx ? s.color : "#2A2E3A" }} />}
           </React.Fragment>
         );
       })}
-      {isAnnule && <span style={{ marginLeft: 10, fontSize: 10, fontWeight: 700, color: statutInfo("annule").color, background: statutInfo("annule").bg, padding: "3px 8px", borderRadius: 6 }}>ANNULÉ</span>}
+      {isBranch && <span style={{ marginLeft: 10, fontSize: 10, fontWeight: 700, color: statutInfo(current).color, background: statutInfo(current).bg, padding: "3px 8px", borderRadius: 6 }}>{statutInfo(current).label.toUpperCase()}</span>}
     </div>
   );
 }
@@ -212,7 +214,7 @@ export default function App() {
         supabase.from("app_passwords").select("*").eq("app_name", APP_NAME_ADMIN).maybeSingle(),
       ]);
       if (a.data) setAgents(a.data);
-      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, configurationMaison: x.configuration_maison })));
+      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, rappelCommentaire: x.rappel_commentaire, configurationMaison: x.configuration_maison })));
       if (cd.data) setCodes(cd.data.map(x => ({ ...x, agentId: x.agent_id })));
       if (pw.data) setAdminStoredPw(pw.data.password);
       else setAdminSetupMode(true);
@@ -224,9 +226,9 @@ export default function App() {
   }, []);
 
   async function addClient(form) {
-    const newRow = { id: uid(), agentId: agentConnecte.id, nomClient: form.nomClient, telephone: form.telephone, adresse: form.adresse, produit: form.produit, dateRdv: form.dateRdv, statut: "confirme", notes: form.notes, configurationMaison: form.configurationMaison, created_at: new Date().toISOString() };
+    const newRow = { id: uid(), agentId: agentConnecte.id, nomClient: form.nomClient, telephone: form.telephone, adresse: form.adresse, produit: form.produit, dateRdv: form.dateRdv, statut: "nouveau", notes: form.notes, configurationMaison: form.configurationMaison, created_at: new Date().toISOString() };
     setClients(prev => [newRow, ...prev]);
-    await supabase.from("crm_clients").insert({ id: newRow.id, agent_id: newRow.agentId, nom_client: newRow.nomClient, telephone: newRow.telephone, adresse: newRow.adresse, produit: newRow.produit, date_rdv: newRow.dateRdv || null, statut: "confirme", notes: newRow.notes, configuration_maison: newRow.configurationMaison });
+    await supabase.from("crm_clients").insert({ id: newRow.id, agent_id: newRow.agentId, nom_client: newRow.nomClient, telephone: newRow.telephone, adresse: newRow.adresse, produit: newRow.produit, date_rdv: newRow.dateRdv || null, statut: "nouveau", notes: newRow.notes, configuration_maison: newRow.configurationMaison });
   }
   async function updateClient(id, updates) {
     setClients(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
@@ -241,6 +243,7 @@ export default function App() {
     if ("configurationMaison" in updates) dbUpdates.configuration_maison = updates.configurationMaison;
     if ("raisonAnnulation" in updates) dbUpdates.raison_annulation = updates.raisonAnnulation;
     if ("rappelDate" in updates) dbUpdates.rappel_date = updates.rappelDate || null;
+    if ("rappelCommentaire" in updates) dbUpdates.rappel_commentaire = updates.rappelCommentaire;
     await supabase.from("crm_clients").update(dbUpdates).eq("id", id);
   }
   async function removeClient(id) {
@@ -453,13 +456,6 @@ function AgentApp({ agent, clients, allClients, agents, addClient, updateClient,
     setEditingId(c.id);
   }
   function cancelEdit() { setEditingId(null); setForm(emptyForm); }
-  function bounceBadge(e) {
-    const el = e.currentTarget;
-    el.style.animation = "none";
-    void el.offsetWidth;
-    el.style.animation = "askgBounce .4s ease";
-  }
-
   const counts = {};
   STATUTS.forEach(s => { counts[s.key] = clients.filter(c => c.statut === s.key).length; });
 
@@ -526,23 +522,22 @@ function AgentApp({ agent, clients, allClients, agents, addClient, updateClient,
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <select className="askg-badge" onClick={bounceBadge} value={c.statut} onChange={e => updateClient(c.id, { statut: e.target.value })} style={{ ...inputStyle, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color, fontWeight: 700, border: "none" }}>
-                        {STATUTS.map(s => <option key={s.key} value={s.key} style={{ background: SURFACE, color: TEXT }}>{s.label}</option>)}
-                      </select>
+                      <span style={{ padding: "5px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color }}>{statutInfo(c.statut).label}</span>
                       <button className="askg-btn" onClick={() => startEdit(c)} style={editBtnStyle}>Modifier</button>
                     </div>
                   </div>
                   <SignalChain current={c.statut} />
                   {c.configurationMaison && <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 10 }}><b style={{ color: TEXT }}>Configuration maison :</b> {c.configurationMaison}</div>}
                   {c.notes && <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 6, fontStyle: "italic" }}>{c.notes}</div>}
-                  {c.rappelDate && (
-                    <div style={{ fontSize: 12, color: "#C4821E", marginTop: 10, background: "rgba(196,130,30,.1)", border: "1px solid rgba(196,130,30,.25)", borderRadius: 8, padding: "6px 10px" }}>
-                      📞 À rappeler le {new Date(c.rappelDate).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
+                  {c.statut === "rappeler" && (
+                    <div style={{ fontSize: 12, color: "#4FB8D9", marginTop: 10, background: "rgba(79,184,217,.1)", border: "1px solid rgba(79,184,217,.25)", borderRadius: 8, padding: "6px 10px" }}>
+                      📞 {c.rappelDate ? `À rappeler le ${new Date(c.rappelDate).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}` : "À rappeler — date non encore fixée par la Direction"}
+                      {c.rappelCommentaire && <div style={{ marginTop: 4 }}>{c.rappelCommentaire}</div>}
                     </div>
                   )}
-                  {c.statut === "annule" && c.raisonAnnulation && (
+                  {c.statut === "annule" && (
                     <div style={{ fontSize: 12, color: "#E0656B", marginTop: 10, background: "rgba(196,61,70,.1)", border: "1px solid rgba(196,61,70,.25)", borderRadius: 8, padding: "6px 10px" }}>
-                      Raison (Direction) : {c.raisonAnnulation}
+                      {c.raisonAnnulation ? `Raison (Direction) : ${c.raisonAnnulation}` : "Annulé — raison non encore précisée par la Direction"}
                     </div>
                   )}
                 </div>
@@ -698,7 +693,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
         {filtres.length === 0 ? <EmptyState text="Aucun client ne correspond à ces filtres." /> : (
           <div style={{ overflowX: "auto" }}>
             <table className="askg-tbl" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-              <thead><tr><Th>Client</Th><Th>Agent</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Date RDV</Th><Th>Statut</Th><Th>À rappeler</Th><Th>Raison (si annulé)</Th><Th>Notes</Th><Th></Th></tr></thead>
+              <thead><tr><Th>Client</Th><Th>Agent</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Date RDV</Th><Th>Statut</Th><Th>Détails (rappel / raison)</Th><Th>Notes</Th><Th></Th></tr></thead>
               <tbody>
                 {filtres.map((c, i) => (
                   <tr key={c.id} className="askg-tbl-row" style={{ transition: "background .2s ease", animation: "askgRowIn .4s ease forwards", animationDelay: Math.min(i * .04, .3) + "s", opacity: 0 }}>
@@ -713,10 +708,16 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
                       </select>
                     </Td>
                     <Td>
-                      <input type="datetime-local" defaultValue={c.rappelDate ? c.rappelDate.slice(0, 16) : ""} onBlur={e => updateClient(c.id, { rappelDate: e.target.value ? new Date(e.target.value).toISOString() : null })} style={{ ...inputStyle, width: 150 }} />
-                    </Td>
-                    <Td>
-                      <input type="text" defaultValue={c.raisonAnnulation || ""} placeholder={c.statut === "annule" ? "Pourquoi perdu..." : "—"} disabled={c.statut !== "annule"} onBlur={e => updateClient(c.id, { raisonAnnulation: e.target.value })} style={{ ...inputStyle, width: 150, opacity: c.statut === "annule" ? 1 : .4, background: "white", color: TEXT, fontWeight: 400 }} />
+                      {c.statut === "rappeler" && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <input type="datetime-local" defaultValue={c.rappelDate ? c.rappelDate.slice(0, 16) : ""} onBlur={e => updateClient(c.id, { rappelDate: e.target.value ? new Date(e.target.value).toISOString() : null })} style={{ ...inputStyle, width: 160 }} />
+                          <input type="text" defaultValue={c.rappelCommentaire || ""} placeholder="Commentaire du rappel..." onBlur={e => updateClient(c.id, { rappelCommentaire: e.target.value })} style={{ ...inputStyle, width: 160, background: "white", color: TEXT, fontWeight: 400 }} />
+                        </div>
+                      )}
+                      {c.statut === "annule" && (
+                        <input type="text" defaultValue={c.raisonAnnulation || ""} placeholder="Pourquoi perdu..." onBlur={e => updateClient(c.id, { raisonAnnulation: e.target.value })} style={{ ...inputStyle, width: 160, background: "white", color: TEXT, fontWeight: 400 }} />
+                      )}
+                      {c.statut !== "rappeler" && c.statut !== "annule" && <span style={{ color: TEXT_MUTED }}>—</span>}
                     </Td>
                     <Td style={{ maxWidth: 160 }}>{c.notes}</Td>
                     <Td><button className="askg-btn" onClick={() => removeClient(c.id)} style={delBtnStyle}>Suppr.</button></Td>
