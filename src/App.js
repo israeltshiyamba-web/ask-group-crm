@@ -6,28 +6,48 @@ import { createClient } from '@supabase/supabase-js';
 // Connecté à la même base de données partagée que le RH/Compta
 // Agents : accès par code personnel (4 chiffres), voient leurs
 // propres clients uniquement. Admin : accès complet.
+//
+// DIRECTION ARTISTIQUE — « console de suivi d'appels »
+// Fond graphite + signal color par étape du pipeline, typo
+// technique (Space Grotesk / Inter / IBM Plex Mono pour les
+// téléphones), pipeline visualisé comme une ligne d'appel.
 // ============================================================
 
 const SUPABASE_URL = "https://sfuuzluaysxrdcqtvuto.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmdXV6bHVheXN4cmRjcXR2dXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwMTU2OTEsImV4cCI6MjA5NzU5MTY5MX0.2N6_dYs56LLV6hLLkxippeyxrMNSp9VlBUt_GUdEdcM";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const NAVY = "#0A1B3D";
-const GOLD = "#D4AF37";
-const GOLD_LIGHT = "#F2E2A8";
+// ─── Tokens de design ────────────────────────────────────────
+const INK = "#14161C";       // fond console (sidebar, écrans de connexion)
+const SURFACE = "#1D2029";   // surfaces sur fond sombre
+const LINE = "#2A2E3A";      // séparateurs sur fond sombre
+const PAPER = "#F5F6F8";     // fond du contenu (clair)
+const CARD = "#FFFFFF";
+const BORDER = "#E2E5EA";
+const INK_SOFT = "#5A6072";
+const TEXT = "#1B1D24";
+
+const SIGNAL = "#FF5A36";    // signal principal (CTA, "live")
 const APP_NAME_ADMIN = "crm_admin";
 
 const STATUTS = [
-  { key: "confirme", label: "Confirmé", color: "#1A4FB4", bg: "#EAF1FF" },
-  { key: "documents", label: "Documents reçus", color: "#8a6500", bg: "#FFF3CD" },
-  { key: "programme", label: "Programmé pour installation", color: "#7A3FA0", bg: "#F1E6FA" },
-  { key: "installe", label: "Installé", color: "#1E7A4C", bg: "#E6F4EC" },
-  { key: "annule", label: "Annulé / Perdu", color: "#B4322B", bg: "#FBE9E7" },
+  { key: "confirme", label: "Confirmé", color: "#3E7CB1", bg: "#E8F1F9" },
+  { key: "documents", label: "Documents reçus", color: "#C4821E", bg: "#FBF0DE" },
+  { key: "programme", label: "Programmé installation", color: "#7A5FC7", bg: "#EFEAFB" },
+  { key: "installe", label: "Installé", color: "#0FA98F", bg: "#E2F7F3" },
+  { key: "annule", label: "Annulé / Perdu", color: "#C43D46", bg: "#FBE7E8" },
 ];
 function statutInfo(key) { return STATUTS.find(s => s.key === key) || STATUTS[0]; }
+function statutIndex(key) { const i = STATUTS.findIndex(s => s.key === key); return i < 0 ? 0 : i; }
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
+
+// ─── Polices ──────────────────────────────────────────────────
+const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');`;
+const FONT_DISPLAY = "'Space Grotesk', 'Inter', sans-serif";
+const FONT_BODY = "'Inter', 'Segoe UI', sans-serif";
+const FONT_MONO = "'IBM Plex Mono', monospace";
 
 export default function App() {
   const [mode, setMode] = useState(null); // null | "agent" | "admin"
@@ -84,7 +104,6 @@ export default function App() {
     await supabase.from("crm_clients").delete().eq("id", id);
   }
 
-  // Codes d'accès agents (admin uniquement)
   async function setAgentCode(agentId, code) {
     const existing = codes.find(c => c.agentId === agentId);
     if (existing) {
@@ -118,7 +137,7 @@ export default function App() {
     return true;
   }
 
-  if (!loaded) return <div style={{ padding: 40, fontFamily: "sans-serif", color: NAVY }}>Chargement...</div>;
+  if (!loaded) return <ConsoleLoading />;
 
   if (!mode) return <ChoixModeScreen onChoose={setMode} />;
 
@@ -160,16 +179,37 @@ export default function App() {
 }
 
 // ============================================================
+// ÉCRAN DE CHARGEMENT
+// ============================================================
+function ConsoleLoading() {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: INK, fontFamily: FONT_BODY }}>
+      <style>{FONT_IMPORT}</style>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#8890A6" }}>
+        <span style={{ width: 8, height: 8, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 12px ${SIGNAL}` }} />
+        <span style={{ fontSize: 13 }}>Connexion à la ligne…</span>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // ÉCRAN DE CHOIX INITIAL
 // ============================================================
 function ChoixModeScreen({ onChoose }) {
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: NAVY, fontFamily: "'Segoe UI', sans-serif" }}>
-      <div style={{ background: "white", borderRadius: 16, padding: 40, width: 380, textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
-        <div style={{ fontSize: 11, letterSpacing: 3, color: GOLD, fontWeight: 700 }}>ASK GROUP SARL</div>
-        <h1 style={{ fontSize: 22, color: NAVY, margin: "8px 0 28px" }}>CRM Clients</h1>
-        <button onClick={() => onChoose("agent")} style={{ width: "100%", background: GOLD, color: NAVY, border: "none", padding: "14px", borderRadius: 10, fontWeight: 700, fontSize: 15, marginBottom: 12, cursor: "pointer" }}>👤 Je suis un agent</button>
-        <button onClick={() => onChoose("admin")} style={{ width: "100%", background: NAVY, color: "white", border: `1px solid ${GOLD}`, padding: "14px", borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: "pointer" }}>🔒 Accès Direction</button>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: INK, fontFamily: FONT_BODY, position: "relative", overflow: "hidden" }}>
+      <style>{FONT_IMPORT}</style>
+      <div style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(circle at 50% 0%, rgba(255,90,54,.14), transparent 55%)` }} />
+      <div style={{ position: "relative", background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 18, padding: 40, width: 380, textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.5)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginBottom: 6 }}>
+          <span style={{ width: 7, height: 7, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 10px ${SIGNAL}` }} />
+          <div style={{ fontSize: 11, letterSpacing: 3, color: "#8890A6", fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
+        </div>
+        <h1 style={{ fontSize: 24, color: "#F5F6F8", margin: "6px 0 2px", fontFamily: FONT_DISPLAY, fontWeight: 700 }}>Ligne Clients</h1>
+        <p style={{ fontSize: 12, color: "#6B7284", margin: "0 0 28px" }}>Suivi des rendez-vous, en direct</p>
+        <button onClick={() => onChoose("agent")} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: "14px", borderRadius: 10, fontWeight: 700, fontSize: 14.5, marginBottom: 10, cursor: "pointer", fontFamily: FONT_DISPLAY, boxShadow: `0 8px 24px rgba(255,90,54,.35)` }}>Je suis un agent</button>
+        <button onClick={() => onChoose("admin")} style={{ width: "100%", background: "transparent", color: "#C7CCDA", border: `1px solid ${LINE}`, padding: "14px", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Accès Direction</button>
       </div>
     </div>
   );
@@ -185,15 +225,16 @@ function AgentLoginScreen({ onLogin, onBack }) {
     if (!onLogin(code)) setError("Code incorrect. Vérifie auprès de la Direction.");
   }
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: NAVY, fontFamily: "'Segoe UI', sans-serif" }}>
-      <div style={{ background: "white", borderRadius: 16, padding: 36, width: 360, boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
-        <div style={{ fontSize: 11, letterSpacing: 3, color: GOLD, fontWeight: 700, textAlign: "center" }}>ASK GROUP SARL</div>
-        <h1 style={{ fontSize: 20, textAlign: "center", color: NAVY, margin: "8px 0 20px" }}>👤 Connexion Agent</h1>
-        <label style={labelStyle}>Ton code personnel (4 chiffres)</label>
-        <input type="password" inputMode="numeric" maxLength={4} value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={{ ...loginInputStyle, textAlign: "center", fontSize: 24, letterSpacing: 8 }} placeholder="••••" autoFocus />
-        {error && <div style={{ color: "#B4322B", fontSize: 12, marginTop: 8 }}>{error}</div>}
-        <button onClick={submit} style={{ width: "100%", background: GOLD, color: NAVY, border: "none", padding: 12, borderRadius: 8, fontWeight: 700, fontSize: 14, marginTop: 18, cursor: "pointer" }}>Se connecter</button>
-        <button onClick={onBack} style={{ width: "100%", background: "none", color: "#6B6B63", border: "none", padding: 10, fontSize: 12, marginTop: 6, cursor: "pointer" }}>← Retour</button>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: INK, fontFamily: FONT_BODY }}>
+      <style>{FONT_IMPORT}</style>
+      <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 18, padding: 36, width: 360, boxShadow: "0 30px 80px rgba(0,0,0,.5)" }}>
+        <div style={{ fontSize: 11, letterSpacing: 3, color: "#8890A6", fontWeight: 600, textAlign: "center", fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
+        <h1 style={{ fontSize: 19, textAlign: "center", color: "#F5F6F8", margin: "10px 0 22px", fontFamily: FONT_DISPLAY, fontWeight: 700 }}>Connexion Agent</h1>
+        <label style={darkLabelStyle}>Ton code personnel</label>
+        <input type="password" inputMode="numeric" maxLength={4} value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={{ ...darkInputStyle, textAlign: "center", fontSize: 26, letterSpacing: 10, fontFamily: FONT_MONO }} placeholder="••••" autoFocus />
+        {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
+        <button onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 700, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Se connecter</button>
+        <button onClick={onBack} style={{ width: "100%", background: "none", color: "#6B7284", border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
       </div>
     </div>
   );
@@ -210,18 +251,19 @@ function AdminSetupScreen({ onSubmit, onBack }) {
     onSubmit(pw);
   }
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: NAVY, fontFamily: "'Segoe UI', sans-serif" }}>
-      <div style={{ background: "white", borderRadius: 16, padding: 36, width: 380, boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
-        <div style={{ fontSize: 11, letterSpacing: 3, color: GOLD, fontWeight: 700, textAlign: "center" }}>ASK GROUP SARL</div>
-        <h1 style={{ fontSize: 20, textAlign: "center", color: NAVY, margin: "8px 0 4px" }}>CRM — Première utilisation Direction</h1>
-        <p style={{ fontSize: 12.5, color: "#6B6B63", textAlign: "center", marginBottom: 24 }}>Crée le mot de passe Admin. Tu seras le seul à le connaître.</p>
-        <label style={labelStyle}>Nouveau mot de passe</label>
-        <input type="password" value={pw} onChange={e => setPw(e.target.value)} style={loginInputStyle} placeholder="Au moins 4 caractères" />
-        <label style={{ ...labelStyle, marginTop: 12 }}>Confirme le mot de passe</label>
-        <input type="password" value={pw2} onChange={e => setPw2(e.target.value)} style={loginInputStyle} />
-        {error && <div style={{ color: "#B4322B", fontSize: 12, marginTop: 8 }}>{error}</div>}
-        <button onClick={submit} style={{ width: "100%", background: GOLD, color: NAVY, border: "none", padding: 12, borderRadius: 8, fontWeight: 700, fontSize: 14, marginTop: 18, cursor: "pointer" }}>Créer mon accès Admin</button>
-        <button onClick={onBack} style={{ width: "100%", background: "none", color: "#6B6B63", border: "none", padding: 10, fontSize: 12, marginTop: 6, cursor: "pointer" }}>← Retour</button>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: INK, fontFamily: FONT_BODY }}>
+      <style>{FONT_IMPORT}</style>
+      <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 18, padding: 36, width: 380, boxShadow: "0 30px 80px rgba(0,0,0,.5)" }}>
+        <div style={{ fontSize: 11, letterSpacing: 3, color: "#8890A6", fontWeight: 600, textAlign: "center", fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
+        <h1 style={{ fontSize: 19, textAlign: "center", color: "#F5F6F8", margin: "10px 0 4px", fontFamily: FONT_DISPLAY, fontWeight: 700 }}>Première utilisation Direction</h1>
+        <p style={{ fontSize: 12.5, color: "#6B7284", textAlign: "center", marginBottom: 22 }}>Crée le mot de passe Admin. Tu seras le seul à le connaître.</p>
+        <label style={darkLabelStyle}>Nouveau mot de passe</label>
+        <input type="password" value={pw} onChange={e => setPw(e.target.value)} style={darkInputStyle} placeholder="Au moins 4 caractères" />
+        <label style={{ ...darkLabelStyle, marginTop: 12 }}>Confirme le mot de passe</label>
+        <input type="password" value={pw2} onChange={e => setPw2(e.target.value)} style={darkInputStyle} />
+        {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
+        <button onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 700, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Créer mon accès Admin</button>
+        <button onClick={onBack} style={{ width: "100%", background: "none", color: "#6B7284", border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
       </div>
     </div>
   );
@@ -234,16 +276,48 @@ function AdminLoginScreen({ storedPw, onLogin, onBack }) {
     else setError("Mot de passe incorrect.");
   }
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: NAVY, fontFamily: "'Segoe UI', sans-serif" }}>
-      <div style={{ background: "white", borderRadius: 16, padding: 36, width: 360, boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
-        <div style={{ fontSize: 11, letterSpacing: 3, color: GOLD, fontWeight: 700, textAlign: "center" }}>ASK GROUP SARL</div>
-        <h1 style={{ fontSize: 20, textAlign: "center", color: NAVY, margin: "8px 0 20px" }}>🔒 Accès Direction</h1>
-        <label style={labelStyle}>Mot de passe</label>
-        <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={loginInputStyle} autoFocus />
-        {error && <div style={{ color: "#B4322B", fontSize: 12, marginTop: 8 }}>{error}</div>}
-        <button onClick={submit} style={{ width: "100%", background: GOLD, color: NAVY, border: "none", padding: 12, borderRadius: 8, fontWeight: 700, fontSize: 14, marginTop: 18, cursor: "pointer" }}>Déverrouiller</button>
-        <button onClick={onBack} style={{ width: "100%", background: "none", color: "#6B6B63", border: "none", padding: 10, fontSize: 12, marginTop: 6, cursor: "pointer" }}>← Retour</button>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: INK, fontFamily: FONT_BODY }}>
+      <style>{FONT_IMPORT}</style>
+      <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 18, padding: 36, width: 360, boxShadow: "0 30px 80px rgba(0,0,0,.5)" }}>
+        <div style={{ fontSize: 11, letterSpacing: 3, color: "#8890A6", fontWeight: 600, textAlign: "center", fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
+        <h1 style={{ fontSize: 19, textAlign: "center", color: "#F5F6F8", margin: "10px 0 22px", fontFamily: FONT_DISPLAY, fontWeight: 700 }}>Accès Direction</h1>
+        <label style={darkLabelStyle}>Mot de passe</label>
+        <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={darkInputStyle} autoFocus />
+        {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
+        <button onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 700, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Déverrouiller</button>
+        <button onClick={onBack} style={{ width: "100%", background: "none", color: "#6B7284", border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// LIGNE DE SIGNAL — visualisation du pipeline (élément signature)
+// ============================================================
+function SignalChain({ current, compact }) {
+  const idx = statutIndex(current);
+  const isAnnule = current === "annule";
+  return (
+    <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+      {STATUTS.filter(s => s.key !== "annule").map((s, i) => {
+        const active = !isAnnule && i <= idx;
+        const isCurrent = !isAnnule && i === idx;
+        return (
+          <React.Fragment key={s.key}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+              <span style={{
+                width: isCurrent ? 12 : 8, height: isCurrent ? 12 : 8, borderRadius: 99,
+                background: active ? s.color : "#DADEE6",
+                boxShadow: isCurrent ? `0 0 0 4px ${s.bg}` : "none",
+                transition: "all .2s",
+              }} />
+              {!compact && <span style={{ fontSize: 9, color: active ? s.color : "#A6ABB8", fontWeight: 600, marginTop: 5, textAlign: "center", maxWidth: 58, lineHeight: 1.15 }}>{s.label}</span>}
+            </div>
+            {i < 3 && <div style={{ flex: 1, height: 2, background: active && i < idx ? s.color : "#DADEE6", margin: compact ? "0 3px" : "0 4px 16px" }} />}
+          </React.Fragment>
+        );
+      })}
+      {isAnnule && <span style={{ marginLeft: 10, fontSize: 10, fontWeight: 700, color: statutInfo("annule").color, background: statutInfo("annule").bg, padding: "3px 8px", borderRadius: 6 }}>ANNULÉ</span>}
     </div>
   );
 }
@@ -272,61 +346,67 @@ function AgentApp({ agent, clients, addClient, updateClient, onLogout }) {
   STATUTS.forEach(s => { counts[s.key] = clients.filter(c => c.statut === s.key).length; });
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F6F5F1", fontFamily: "'Segoe UI', sans-serif" }}>
-      <div style={{ background: NAVY, color: "white", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 10, letterSpacing: 2, color: GOLD, fontWeight: 600 }}>ASK GROUP — CRM</div>
-          <div style={{ fontSize: 17, fontWeight: 700 }}>👤 {agent.nom}</div>
+    <div style={{ minHeight: "100vh", background: PAPER, fontFamily: FONT_BODY }}>
+      <style>{FONT_IMPORT}{RESPONSIVE_CSS}</style>
+      <div style={{ background: INK, color: "white", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: SIGNAL, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 15 }}>{agent.nom.charAt(0)}</div>
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: 2, color: "#8890A6", fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP — LIGNE CLIENTS</div>
+            <div style={{ fontSize: 17, fontWeight: 700, fontFamily: FONT_DISPLAY }}>{agent.nom}</div>
+          </div>
         </div>
-        <button onClick={onLogout} style={{ background: "rgba(255,255,255,.1)", color: "white", border: "none", padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔒 Déconnexion</button>
+        <button onClick={onLogout} style={{ background: "rgba(255,255,255,.08)", color: "white", border: `1px solid ${LINE}`, padding: "9px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Déconnexion</button>
       </div>
 
       <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
           {STATUTS.map(s => (
-            <div key={s.key} style={{ background: "white", border: "1px solid #E4E1D8", borderRadius: 10, padding: 12 }}>
-              <div style={{ fontSize: 10, color: "#6B6B63", textTransform: "uppercase", fontWeight: 600 }}>{s.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4, color: s.color }}>{counts[s.key]}</div>
+            <div key={s.key} style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14, borderTop: `3px solid ${s.color}` }}>
+              <div style={{ fontSize: 9.5, color: INK_SOFT, textTransform: "uppercase", fontWeight: 700, letterSpacing: .3 }}>{s.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, marginTop: 5, color: s.color, fontFamily: FONT_DISPLAY }}>{counts[s.key]}</div>
             </div>
           ))}
         </div>
 
-        <Panel title={editingId ? "Modifier le client" : "+ Nouveau client / rendez-vous"}>
+        <Panel title={editingId ? "Modifier le client" : "Nouveau client / rendez-vous"} accent>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
             <Field label="Nom du client"><input type="text" value={form.nomClient} onChange={e => setForm({ ...form, nomClient: e.target.value })} style={{ ...inputStyle, width: 170 }} /></Field>
-            <Field label="Téléphone"><input type="text" value={form.telephone} onChange={e => setForm({ ...form, telephone: e.target.value })} style={{ ...inputStyle, width: 140 }} /></Field>
+            <Field label="Téléphone"><input type="text" value={form.telephone} onChange={e => setForm({ ...form, telephone: e.target.value })} style={{ ...inputStyle, width: 140, fontFamily: FONT_MONO }} /></Field>
             <Field label="Adresse"><input type="text" value={form.adresse} onChange={e => setForm({ ...form, adresse: e.target.value })} style={{ ...inputStyle, width: 180 }} /></Field>
             <Field label="Produit / Service"><input type="text" value={form.produit} onChange={e => setForm({ ...form, produit: e.target.value })} style={{ ...inputStyle, width: 170 }} /></Field>
             <Field label="Date RDV"><input type="date" value={form.dateRdv} onChange={e => setForm({ ...form, dateRdv: e.target.value })} style={inputStyle} /></Field>
             <Field label="Notes"><input type="text" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} style={{ ...inputStyle, width: 180 }} /></Field>
-            <button onClick={submit} style={{ background: GOLD, color: NAVY, border: "none", padding: "9px 18px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 12 }}>{editingId ? "Enregistrer" : "+ Ajouter"}</button>
-            {editingId && <button onClick={cancelEdit} style={{ background: "#F0F0EE", color: "#6B6B63", border: "none", padding: "9px 18px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 12 }}>Annuler</button>}
+            <button onClick={submit} style={primaryBtnStyle}>{editingId ? "Enregistrer" : "+ Ajouter"}</button>
+            {editingId && <button onClick={cancelEdit} style={ghostBtnStyle}>Annuler</button>}
           </div>
         </Panel>
 
         <Panel title={`Mes clients (${clients.length})`}>
           {clients.length === 0 ? <EmptyState text="Aucun client enregistré pour l'instant." /> : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-                <thead><tr><Th>Client</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Date RDV</Th><Th>Statut</Th><Th>Notes</Th><Th></Th></tr></thead>
-                <tbody>
-                  {clients.map(c => (
-                    <tr key={c.id}>
-                      <Td><b>{c.nomClient}</b></Td>
-                      <Td>{c.telephone}</Td>
-                      <Td>{c.produit}</Td>
-                      <Td>{c.dateRdv ? new Date(c.dateRdv).toLocaleDateString("fr-FR") : "—"}</Td>
-                      <Td>
-                        <select value={c.statut} onChange={e => updateClient(c.id, { statut: e.target.value })} style={{ ...inputStyle, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color, fontWeight: 700 }}>
-                          {STATUTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                        </select>
-                      </Td>
-                      <Td style={{ maxWidth: 160 }}>{c.notes}</Td>
-                      <Td><button onClick={() => startEdit(c)} style={editBtnStyle}>Modifier</button></Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {clients.map(c => (
+                <div key={c.id} style={{ border: `1px solid ${BORDER}`, borderRadius: 12, padding: 14, background: CARD }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: TEXT, fontFamily: FONT_DISPLAY }}>{c.nomClient}</div>
+                      <div style={{ fontSize: 12, color: INK_SOFT, marginTop: 2, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        <span style={{ fontFamily: FONT_MONO }}>{c.telephone}</span>
+                        {c.produit && <span>· {c.produit}</span>}
+                        {c.dateRdv && <span>· {new Date(c.dateRdv).toLocaleDateString("fr-FR")}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <select value={c.statut} onChange={e => updateClient(c.id, { statut: e.target.value })} style={{ ...inputStyle, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color, fontWeight: 700, border: "none" }}>
+                        {STATUTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                      </select>
+                      <button onClick={() => startEdit(c)} style={editBtnStyle}>Modifier</button>
+                    </div>
+                  </div>
+                  <SignalChain current={c.statut} />
+                  {c.notes && <div style={{ fontSize: 12, color: INK_SOFT, marginTop: 10, fontStyle: "italic" }}>{c.notes}</div>}
+                </div>
+              ))}
             </div>
           )}
         </Panel>
@@ -341,21 +421,23 @@ function AgentApp({ agent, clients, addClient, updateClient, onLogout }) {
 function AdminApp({ agents, clients, codes, setAgentCode, updateClient, removeClient, onChangePassword, onLogout }) {
   const [page, setPage] = useState("dashboard");
   return (
-    <div className="askg-shell" style={{ display: "flex", minHeight: "100vh", fontFamily: "'Segoe UI', sans-serif", background: "#F6F5F1" }}>
-      <style>{RESPONSIVE_CSS}</style>
-      <div className="askg-sidebar" style={{ width: 230, background: NAVY, color: "white", padding: "24px 0", flexShrink: 0 }}>
-        <div className="askg-sidebar-header" style={{ padding: "0 24px 20px", borderBottom: "1px solid rgba(255,255,255,.1)", marginBottom: 16 }}>
-          <div style={{ fontSize: 11, letterSpacing: 3, color: GOLD, fontWeight: 600 }}>ASK GROUP</div>
-          <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>CRM — Direction</div>
-          <div style={{ fontSize: 10, color: "rgba(255,255,255,.5)", marginTop: 2 }}>🟢 Données partagées en ligne</div>
+    <div className="askg-shell" style={{ display: "flex", minHeight: "100vh", fontFamily: FONT_BODY, background: PAPER }}>
+      <style>{FONT_IMPORT}{RESPONSIVE_CSS}</style>
+      <div className="askg-sidebar" style={{ width: 236, background: INK, color: "white", padding: "24px 0", flexShrink: 0 }}>
+        <div className="askg-sidebar-header" style={{ padding: "0 24px 20px", borderBottom: `1px solid ${LINE}`, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 7, height: 7, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 10px ${SIGNAL}` }} />
+          <div>
+            <div style={{ fontSize: 10, letterSpacing: 2, color: "#8890A6", fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP</div>
+            <div style={{ fontSize: 17, fontWeight: 700, fontFamily: FONT_DISPLAY }}>CRM — Direction</div>
+          </div>
         </div>
         <div className="askg-sidebar-nav">
           {[["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["codes", "Codes agents"], ["parametres", "Paramètres"]].map(([k, l]) => (
-            <div key={k} onClick={() => setPage(k)} style={{ padding: "12px 24px", fontSize: 13, cursor: "pointer", borderLeft: page === k ? `3px solid ${GOLD}` : "3px solid transparent", background: page === k ? "rgba(212,175,55,.12)" : "transparent", color: page === k ? GOLD_LIGHT : "rgba(255,255,255,.65)", fontWeight: page === k ? 600 : 400 }}>{l}</div>
+            <div key={k} onClick={() => setPage(k)} style={{ padding: "12px 24px", fontSize: 13, cursor: "pointer", borderLeft: page === k ? `3px solid ${SIGNAL}` : "3px solid transparent", background: page === k ? "rgba(255,90,54,.1)" : "transparent", color: page === k ? "#FFB39F" : "#9096A6", fontWeight: page === k ? 700 : 500 }}>{l}</div>
           ))}
         </div>
         <div className="askg-sidebar-footer" style={{ margin: "20px 24px 0" }}>
-          <button onClick={onLogout} style={{ width: "100%", background: "rgba(255,255,255,.08)", color: "rgba(255,255,255,.8)", border: "none", padding: 10, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>🔒 Verrouiller</button>
+          <button onClick={onLogout} style={{ width: "100%", background: "rgba(255,255,255,.06)", color: "#C7CCDA", border: `1px solid ${LINE}`, padding: 10, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Verrouiller</button>
         </div>
       </div>
       <div className="askg-main" style={{ flex: 1, padding: "28px 36px", overflowX: "auto" }}>
@@ -376,22 +458,23 @@ function DashboardPage({ agents, clients }) {
 
   return (
     <>
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 22, margin: 0, fontWeight: 700, color: NAVY }}>Tableau de bord CRM</h1>
-        <div style={{ fontSize: 12.5, color: "#6B6B63", marginTop: 3 }}>Vue d'ensemble de tous les agents</div>
-      </div>
+      <PageHeader title="Tableau de bord" subtitle="Vue d'ensemble de tous les agents, en direct" />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 22 }}>
         {STATUTS.map(s => (
-          <div key={s.key} style={{ background: "white", border: "1px solid #E4E1D8", borderRadius: 12, padding: "14px 16px" }}>
-            <div style={{ fontSize: 10, color: "#6B6B63", textTransform: "uppercase", fontWeight: 600 }}>{s.label}</div>
-            <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4, color: s.color }}>{counts[s.key]}</div>
+          <div key={s.key} style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "14px 16px", borderTop: `3px solid ${s.color}` }}>
+            <div style={{ fontSize: 9.5, color: INK_SOFT, textTransform: "uppercase", fontWeight: 700, letterSpacing: .3 }}>{s.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, marginTop: 5, color: s.color, fontFamily: FONT_DISPLAY }}>{counts[s.key]}</div>
           </div>
         ))}
       </div>
+      <Panel title="Ligne de pipeline globale" accent>
+        <SignalChain current={STATUTS[Math.min(3, Math.round((counts.confirme*0+counts.documents*1+counts.programme*2+counts.installe*3)/Math.max(1,(counts.confirme+counts.documents+counts.programme+counts.installe))))].key} />
+        <div style={{ fontSize: 11, color: INK_SOFT, marginTop: 14 }}>Position moyenne de l'ensemble des dossiers actifs dans le pipeline.</div>
+      </Panel>
       <Panel title="Performance par agent">
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
           <thead><tr><Th>Agent</Th><Th>Total clients</Th><Th>Installés</Th></tr></thead>
-          <tbody>{parAgent.map(a => (<tr key={a.nom}><Td><b>{a.nom}</b></Td><Td>{a.total}</Td><Td style={{ color: "#1E7A4C" }}><b>{a.installes}</b></Td></tr>))}</tbody>
+          <tbody>{parAgent.map(a => (<tr key={a.nom}><Td><b>{a.nom}</b></Td><Td>{a.total}</Td><Td style={{ color: statutInfo("installe").color }}><b>{a.installes}</b></Td></tr>))}</tbody>
         </table>
       </Panel>
       <Panel title="Derniers clients ajoutés">
@@ -415,10 +498,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
 
   return (
     <>
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 22, margin: 0, fontWeight: 700, color: NAVY }}>Tous les clients</h1>
-        <div style={{ fontSize: 12.5, color: "#6B6B63", marginTop: 3 }}>Vue complète, tous agents confondus — modifiable</div>
-      </div>
+      <PageHeader title="Tous les clients" subtitle="Vue complète, tous agents confondus — modifiable" />
       <Panel title="Filtres">
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
           <Field label="Agent">
@@ -445,7 +525,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
                   <tr key={c.id}>
                     <Td><b>{c.nomClient}</b></Td>
                     <Td>{nomAgent(c.agentId)}</Td>
-                    <Td>{c.telephone}</Td>
+                    <Td style={{ fontFamily: FONT_MONO }}>{c.telephone}</Td>
                     <Td>{c.produit}</Td>
                     <Td>{c.dateRdv ? new Date(c.dateRdv).toLocaleDateString("fr-FR") : "—"}</Td>
                     <Td>
@@ -477,10 +557,7 @@ function CodesAgentsPage({ agents, codes, setAgentCode }) {
   }
   return (
     <>
-      <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 22, margin: 0, fontWeight: 700, color: NAVY }}>Codes d'accès agents</h1>
-        <div style={{ fontSize: 12.5, color: "#6B6B63", marginTop: 3 }}>Chaque agent utilise ce code (4 chiffres) pour se connecter au CRM et voir ses propres clients</div>
-      </div>
+      <PageHeader title="Codes d'accès agents" subtitle="Chaque agent utilise ce code (4 chiffres) pour se connecter et voir ses propres clients" />
       <Panel title="Tous les agents">
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
           <thead><tr><Th>Agent</Th><Th>Code actuel</Th><Th>Nouveau code</Th><Th></Th></tr></thead>
@@ -488,15 +565,15 @@ function CodesAgentsPage({ agents, codes, setAgentCode }) {
             {agents.map(a => (
               <tr key={a.id}>
                 <Td><b>{a.nom}</b></Td>
-                <Td>{codeActuel(a.id) ? <b style={{ letterSpacing: 3 }}>{codeActuel(a.id)}</b> : <span style={{ color: "#999" }}>Aucun code défini</span>}</Td>
-                <Td><input type="text" maxLength={4} value={edits[a.id] || ""} onChange={e => setEdits(prev => ({ ...prev, [a.id]: e.target.value.replace(/\D/g, "") }))} placeholder="0000" style={{ ...inputStyle, width: 70, textAlign: "center", letterSpacing: 3 }} /></Td>
+                <Td>{codeActuel(a.id) ? <b style={{ letterSpacing: 3, fontFamily: FONT_MONO }}>{codeActuel(a.id)}</b> : <span style={{ color: "#A6ABB8" }}>Aucun code défini</span>}</Td>
+                <Td><input type="text" maxLength={4} value={edits[a.id] || ""} onChange={e => setEdits(prev => ({ ...prev, [a.id]: e.target.value.replace(/\D/g, "") }))} placeholder="0000" style={{ ...inputStyle, width: 70, textAlign: "center", letterSpacing: 3, fontFamily: FONT_MONO }} /></Td>
                 <Td><button onClick={() => submit(a.id)} style={editBtnStyle}>{codeActuel(a.id) ? "Modifier" : "Créer"}</button></Td>
               </tr>
             ))}
           </tbody>
         </table>
       </Panel>
-      <div style={{ fontSize: 11, color: "#999" }}>ℹ️ Communique le code à chaque agent individuellement, en privé.</div>
+      <div style={{ fontSize: 11, color: INK_SOFT }}>Communique le code à chaque agent individuellement, en privé.</div>
     </>
   );
 }
@@ -512,17 +589,17 @@ function ParametresPage({ onChangePassword }) {
   }
   return (
     <>
-      <div style={{ marginBottom: 22 }}><h1 style={{ fontSize: 22, margin: 0, fontWeight: 700, color: NAVY }}>Paramètres</h1><div style={{ fontSize: 12.5, color: "#6B6B63", marginTop: 3 }}>Sécurité de l'accès Direction</div></div>
+      <PageHeader title="Paramètres" subtitle="Sécurité de l'accès Direction" />
       <Panel title="Changer le mot de passe Admin">
         <div style={{ maxWidth: 320 }}>
           <label style={labelStyle}>Mot de passe actuel</label>
-          <input type="password" value={oldPw} onChange={e => setOldPw(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 10, background: "white", color: "#1C1C1A" }} />
+          <input type="password" value={oldPw} onChange={e => setOldPw(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 10, background: "white", color: TEXT }} />
           <label style={labelStyle}>Nouveau mot de passe</label>
-          <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 10, background: "white", color: "#1C1C1A" }} />
+          <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 10, background: "white", color: TEXT }} />
           <label style={labelStyle}>Confirme le nouveau mot de passe</label>
-          <input type="password" value={newPw2} onChange={e => setNewPw2(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 14, background: "white", color: "#1C1C1A" }} />
-          {msg && <div style={{ fontSize: 12, color: msg.startsWith("✓") ? "#1E7A4C" : "#B4322B", marginBottom: 10 }}>{msg}</div>}
-          <button onClick={submit} style={{ background: NAVY, color: "white", border: "none", padding: "10px 20px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 12 }}>Modifier le mot de passe</button>
+          <input type="password" value={newPw2} onChange={e => setNewPw2(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 14, background: "white", color: TEXT }} />
+          {msg && <div style={{ fontSize: 12, color: msg.startsWith("✓") ? statutInfo("installe").color : "#C43D46", marginBottom: 10 }}>{msg}</div>}
+          <button onClick={submit} style={primaryBtnStyle}>Modifier le mot de passe</button>
         </div>
       </Panel>
     </>
@@ -549,20 +626,38 @@ const RESPONSIVE_CSS = `
 // ============================================================
 // COMPOSANTS UTILITAIRES
 // ============================================================
-function Panel({ title, children }) {
-  return (<div style={{ background: "white", border: "1px solid #E4E1D8", borderRadius: 12, marginBottom: 20, overflow: "hidden" }}><div style={{ padding: "16px 20px", borderBottom: "1px solid #E4E1D8" }}><h2 style={{ fontSize: 14.5, margin: 0, fontWeight: 700, color: NAVY }}>{title}</h2></div><div style={{ padding: 18 }}>{children}</div></div>);
+function PageHeader({ title, subtitle }) {
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <h1 style={{ fontSize: 23, margin: 0, fontWeight: 700, color: TEXT, fontFamily: FONT_DISPLAY }}>{title}</h1>
+      <div style={{ fontSize: 12.5, color: INK_SOFT, marginTop: 4 }}>{subtitle}</div>
+    </div>
+  );
+}
+function Panel({ title, children, accent }) {
+  return (
+    <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 14, marginBottom: 18, overflow: "hidden" }}>
+      <div style={{ padding: "15px 20px", borderBottom: `1px solid ${BORDER}`, borderLeft: accent ? `3px solid ${SIGNAL}` : "none", display: "flex", alignItems: "center", gap: 8 }}>
+        <h2 style={{ fontSize: 13.5, margin: 0, fontWeight: 700, color: TEXT, fontFamily: FONT_DISPLAY }}>{title}</h2>
+      </div>
+      <div style={{ padding: 18 }}>{children}</div>
+    </div>
+  );
 }
 function Field({ label, children }) { return <div><label style={labelStyle}>{label}</label>{children}</div>; }
-function Th({ children }) { return <th style={{ textAlign: "left", padding: "8px 10px", background: "#FAFAF7", color: "#6B6B63", fontWeight: 600, fontSize: 10, textTransform: "uppercase", borderBottom: "1px solid #E4E1D8", whiteSpace: "nowrap" }}>{children}</th>; }
-function Td({ children, style }) { return <td style={{ padding: "8px 10px", borderBottom: "1px solid #E4E1D8", ...style }}>{children}</td>; }
+function Th({ children }) { return <th style={{ textAlign: "left", padding: "8px 10px", background: "#FAFBFC", color: INK_SOFT, fontWeight: 700, fontSize: 9.5, textTransform: "uppercase", letterSpacing: .3, borderBottom: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>{children}</th>; }
+function Td({ children, style }) { return <td style={{ padding: "9px 10px", borderBottom: `1px solid ${BORDER}`, color: TEXT, ...style }}>{children}</td>; }
 function StatutBadge({ value }) {
   const s = statutInfo(value);
-  return <span style={{ padding: "3px 9px", borderRadius: 6, fontSize: 11, fontWeight: 600, color: s.color, background: s.bg }}>{s.label}</span>;
+  return <span style={{ padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, color: s.color, background: s.bg }}>{s.label}</span>;
 }
-function EmptyState({ text }) { return <div style={{ textAlign: "center", padding: "30px 10px", color: "#999", fontSize: 13 }}>{text}</div>; }
+function EmptyState({ text }) { return <div style={{ textAlign: "center", padding: "30px 10px", color: "#A6ABB8", fontSize: 13 }}>{text}</div>; }
 
-const inputStyle = { border: "1px solid #E4E1D8", borderRadius: 5, padding: "7px 9px", fontSize: 12, background: "#EAF1FF", color: "#1A4FB4", fontWeight: 600 };
-const loginInputStyle = { width: "100%", border: "1px solid #E4E1D8", borderRadius: 8, padding: "10px 12px", fontSize: 14, marginTop: 4, boxSizing: "border-box" };
-const labelStyle = { display: "block", fontSize: 11, fontWeight: 600, color: "#6B6B63", marginBottom: 4 };
-const delBtnStyle = { background: "#FBE9E7", color: "#B4322B", border: "none", padding: "4px 9px", borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: "pointer" };
-const editBtnStyle = { background: "#EAF1FF", color: "#1A4FB4", border: "none", padding: "4px 9px", borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: "pointer" };
+const inputStyle = { border: `1px solid ${BORDER}`, borderRadius: 7, padding: "8px 10px", fontSize: 12, background: "#F0F3FF", color: "#2A4FA0", fontWeight: 600, fontFamily: FONT_BODY };
+const darkInputStyle = { width: "100%", border: `1px solid ${LINE}`, borderRadius: 9, padding: "11px 13px", fontSize: 14, marginTop: 4, boxSizing: "border-box", background: "#12141A", color: "#F5F6F8" };
+const labelStyle = { display: "block", fontSize: 11, fontWeight: 700, color: INK_SOFT, marginBottom: 5 };
+const darkLabelStyle = { display: "block", fontSize: 11, fontWeight: 600, color: "#8890A6", marginBottom: 5 };
+const delBtnStyle = { background: statutInfo("annule").bg, color: statutInfo("annule").color, border: "none", padding: "5px 10px", borderRadius: 7, fontSize: 10.5, fontWeight: 700, cursor: "pointer" };
+const editBtnStyle = { background: "#F0F3FF", color: "#2A4FA0", border: "none", padding: "5px 10px", borderRadius: 7, fontSize: 10.5, fontWeight: 700, cursor: "pointer" };
+const primaryBtnStyle = { background: SIGNAL, color: "white", border: "none", padding: "10px 20px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 12.5, fontFamily: FONT_DISPLAY };
+const ghostBtnStyle = { background: "#EEF0F4", color: INK_SOFT, border: "none", padding: "10px 20px", borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 12.5 };
