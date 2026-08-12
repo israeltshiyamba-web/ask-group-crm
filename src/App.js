@@ -175,8 +175,12 @@ ${FONT_IMPORT}
 .askg-tbl-row:hover { background:rgba(45,108,223,.07) !important; }
 .askg-tbl th.sortable:hover { color:${TEXT} !important; }
 .askg-badge:active { transform:scale(.9); }
-.askg-btn:active { transform:scale(.96); }
+.askg-btn { transition: transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease, background .2s ease, filter .2s ease; }
+.askg-btn:active { transform:scale(.94); }
+.askg-btn:hover { filter:brightness(1.12); transform:translateY(-1px); }
 .askg-btn-primary:hover { box-shadow:0 14px 34px rgba(45,108,223,.5) !important; transform:translateY(-2px); }
+.askg-kpi, .askg-client-card { transition: transform .25s cubic-bezier(.34,1.56,.64,1), border-color .2s ease, box-shadow .2s ease; }
+.askg-kpi:hover { box-shadow: 0 10px 26px rgba(0,0,0,.3); }
 .askg-nav-item:hover { color:${TEXT} !important; }
 @media (max-width: 768px) {
   .askg-shell { flex-direction: column !important; }
@@ -375,11 +379,11 @@ function AdminCoordonneesModal({ client, onSave, onClose }) {
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 14 }}>
         {editing ? (
           <>
-            <button className="askg-btn" onClick={save} style={primaryBtnStyle}>Enregistrer</button>
-            <button className="askg-btn" onClick={() => setEditing(false)} style={ghostBtnStyle}>Annuler</button>
+            <button className="askg-btn" onClick={(e) => { ripple(e); save(); }} style={primaryBtnStyle}>Enregistrer</button>
+            <button className="askg-btn" onClick={(e) => { ripple(e); setEditing(false); }} style={ghostBtnStyle}>Annuler</button>
           </>
         ) : (
-          <button className="askg-btn" onClick={() => setEditing(true)} style={editBtnStyle}>Modifier</button>
+          <button className="askg-btn" onClick={(e) => { ripple(e); setEditing(true); }} style={editBtnStyle}>Modifier</button>
         )}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -405,11 +409,11 @@ function AdminConfigMaisonModal({ client, onSave, onClose }) {
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 14 }}>
         {editing ? (
           <>
-            <button className="askg-btn" onClick={save} style={primaryBtnStyle}>Enregistrer</button>
-            <button className="askg-btn" onClick={() => setEditing(false)} style={ghostBtnStyle}>Annuler</button>
+            <button className="askg-btn" onClick={(e) => { ripple(e); save(); }} style={primaryBtnStyle}>Enregistrer</button>
+            <button className="askg-btn" onClick={(e) => { ripple(e); setEditing(false); }} style={ghostBtnStyle}>Annuler</button>
           </>
         ) : (
-          <button className="askg-btn" onClick={() => setEditing(true)} style={editBtnStyle}>Modifier</button>
+          <button className="askg-btn" onClick={(e) => { ripple(e); setEditing(true); }} style={editBtnStyle}>Modifier</button>
         )}
       </div>
       {Object.entries(FIELDS_CONFIG).map(([section, fields]) => (
@@ -678,7 +682,7 @@ function AgentLoginScreen({ onLogin, onBack }) {
         <label style={darkLabelStyle}>Ton code personnel</label>
         <PasswordInput value={code} onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 4))} onKeyDown={e => e.key === "Enter" && submit()} style={{ ...darkInputStyle, textAlign: "center", fontSize: 26, letterSpacing: 10, fontFamily: FONT_MONO }} placeholder="••••" autoFocus centered />
         {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
-        <button className="askg-btn" onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Se connecter</button>
+        <button className="askg-btn" onClick={(e) => { ripple(e); submit(); }} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Se connecter</button>
         <button onClick={onBack} style={{ width: "100%", background: "none", color: TEXT_MUTED, border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
       </div>
     </AuthShell>
@@ -703,7 +707,7 @@ function AdminSetupScreen({ onSubmit, onBack }) {
         <label style={{ ...darkLabelStyle, marginTop: 12 }}>Confirme le mot de passe</label>
         <PasswordInput value={pw2} onChange={e => setPw2(e.target.value)} style={darkInputStyle} />
         {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
-        <button className="askg-btn" onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Créer mon accès Admin</button>
+        <button className="askg-btn" onClick={(e) => { ripple(e); submit(); }} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Créer mon accès Admin</button>
         <button onClick={onBack} style={{ width: "100%", background: "none", color: TEXT_MUTED, border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
       </div>
     </AuthShell>
@@ -721,7 +725,7 @@ function AdminLoginScreen({ storedPw, onLogin, onBack }) {
         <label style={darkLabelStyle}>Mot de passe</label>
         <PasswordInput value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={darkInputStyle} autoFocus />
         {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
-        <button className="askg-btn" onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Connexion</button>
+        <button className="askg-btn" onClick={(e) => { ripple(e); submit(); }} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Connexion</button>
         <button onClick={onBack} style={{ width: "100%", background: "none", color: TEXT_MUTED, border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
       </div>
     </AuthShell>
@@ -772,10 +776,11 @@ function AgentApp({ agent, clients, allClients, agents, donneesRH, addClient, up
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div style={{ display: "flex", background: "rgba(255,255,255,.05)", borderRadius: 99, padding: 4, border: `1px solid ${LINE}` }}>
-            <button onClick={() => setVue("perso")} style={{ border: "none", borderRadius: 99, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: vue === "perso" ? SIGNAL : "transparent", color: vue === "perso" ? "white" : TEXT_MUTED, transition: "all .2s ease" }}>Mon espace</button>
-            <button onClick={() => setVue("collectif")} style={{ border: "none", borderRadius: 99, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: vue === "collectif" ? SIGNAL : "transparent", color: vue === "collectif" ? "white" : TEXT_MUTED, transition: "all .2s ease" }}>Espace collectif</button>
-            <button onClick={() => setVue("primes")} style={{ border: "none", borderRadius: 99, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: vue === "primes" ? SIGNAL : "transparent", color: vue === "primes" ? "white" : TEXT_MUTED, transition: "all .2s ease" }}>💰 Mes primes</button>
+          <div style={{ position: "relative", display: "flex", background: "rgba(255,255,255,.05)", borderRadius: 99, padding: 4, border: `1px solid ${LINE}`, width: 330 }}>
+            <div style={{ position: "absolute", top: 4, bottom: 4, left: `calc(${["perso", "collectif", "primes"].indexOf(vue)} * ((100% - 8px) / 3) + 4px)`, width: "calc((100% - 8px) / 3)", background: SIGNAL, borderRadius: 99, transition: "left .35s cubic-bezier(.16,1,.3,1)", boxShadow: "0 4px 14px rgba(45,108,223,.45)" }} />
+            {[["perso", "Mon espace"], ["collectif", "Espace collectif"], ["primes", "💰 Mes primes"]].map(([k, l]) => (
+              <button key={k} onClick={(e) => { ripple(e); setVue(k); }} style={{ position: "relative", zIndex: 1, flex: 1, border: "none", background: "transparent", borderRadius: 99, padding: "7px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", color: vue === k ? "white" : TEXT_MUTED, transition: "color .25s ease", overflow: "hidden" }}>{l}</button>
+            ))}
           </div>
           <button onClick={onLogout} style={{ background: "rgba(255,255,255,.06)", color: TEXT, border: `1px solid ${LINE}`, padding: "9px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Déconnexion</button>
         </div>
@@ -784,7 +789,7 @@ function AgentApp({ agent, clients, allClients, agents, donneesRH, addClient, up
       <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
         <div key={vue} style={{ animation: "askgPageIn .4s cubic-bezier(.16,1,.3,1)" }}>
         {vue === "collectif" ? (
-          <EspaceCollectif agents={agents} allClients={allClients} agentActuelId={agent.id} />
+          <EspaceCollectif agents={agents} allClients={allClients} agentActuelId={agent.id} donneesRH={donneesRH} />
         ) : vue === "primes" ? (
           <MesPrimesPage agent={agent} allClients={allClients} donneesRH={donneesRH} />
         ) : (
@@ -800,13 +805,13 @@ function AgentApp({ agent, clients, allClients, agents, donneesRH, addClient, up
 
         <Panel title={editingId ? "Modifier le client" : "Nouveau client / rendez-vous"} accent>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <button className="askg-btn" onClick={() => setModalOpen("coord")} style={{ ...ghostBtnStyle, borderColor: coordRemplis > 0 ? SIGNAL : LINE, color: coordRemplis > 0 ? "#9CC0FF" : TEXT_MUTED, padding: "12px 16px" }}>📇 Coordonnées client {coordRemplis > 0 && <span style={{ fontFamily: FONT_MONO, marginLeft: 4 }}>({coordRemplis}/{FIELDS_COORDONNEES.length})</span>}</button>
-            <button className="askg-btn" onClick={() => setModalOpen("config")} style={{ ...ghostBtnStyle, borderColor: configRemplis > 0 ? SIGNAL : LINE, color: configRemplis > 0 ? "#9CC0FF" : TEXT_MUTED, padding: "12px 16px" }}>🏠 Configuration de la maison {configRemplis > 0 && <span style={{ fontFamily: FONT_MONO, marginLeft: 4 }}>({configRemplis}/{configTotal})</span>}</button>
+            <button className="askg-btn" onClick={(e) => { ripple(e); setModalOpen("coord"); }} style={{ ...ghostBtnStyle, borderColor: coordRemplis > 0 ? SIGNAL : LINE, color: coordRemplis > 0 ? "#9CC0FF" : TEXT_MUTED, padding: "12px 16px" }}>📇 Coordonnées client {coordRemplis > 0 && <span style={{ fontFamily: FONT_MONO, marginLeft: 4 }}>({coordRemplis}/{FIELDS_COORDONNEES.length})</span>}</button>
+            <button className="askg-btn" onClick={(e) => { ripple(e); setModalOpen("config"); }} style={{ ...ghostBtnStyle, borderColor: configRemplis > 0 ? SIGNAL : LINE, color: configRemplis > 0 ? "#9CC0FF" : TEXT_MUTED, padding: "12px 16px" }}>🏠 Configuration de la maison {configRemplis > 0 && <span style={{ fontFamily: FONT_MONO, marginLeft: 4 }}>({configRemplis}/{configTotal})</span>}</button>
             <Field label="Produit / Service"><input type="text" value={form.produit} onChange={e => setForm({ ...form, produit: e.target.value })} style={{ ...inputStyle, width: 170 }} /></Field>
             <Field label="Date RDV"><input type="date" value={form.dateRdv} onChange={e => setForm({ ...form, dateRdv: e.target.value })} style={inputStyle} /></Field>
             <Field label="Commentaires / Notes"><input type="text" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} style={{ ...inputStyle, width: 180 }} /></Field>
-            <button className="askg-btn" onClick={submit} style={primaryBtnStyle}>{editingId ? "Enregistrer" : "+ Ajouter"}</button>
-            {editingId && <button className="askg-btn" onClick={cancelEdit} style={ghostBtnStyle}>Annuler</button>}
+            <button className="askg-btn" onClick={(e) => { ripple(e); submit(); }} style={primaryBtnStyle}>{editingId ? "Enregistrer" : "+ Ajouter"}</button>
+            {editingId && <button className="askg-btn" onClick={(e) => { ripple(e); cancelEdit(); }} style={ghostBtnStyle}>Annuler</button>}
           </div>
           {!form.nomClient && <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 10 }}>💡 Remplis au moins le nom et le téléphone dans "Coordonnées client" avant d'ajouter.</div>}
         </Panel>
@@ -830,13 +835,13 @@ function AgentApp({ agent, clients, allClients, agents, donneesRH, addClient, up
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <span style={{ padding: "5px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color }}>{statutInfo(c.statut).label}</span>
-                      <button className="askg-btn" onClick={() => startEdit(c)} style={editBtnStyle}>Modifier</button>
+                      <button className="askg-btn" onClick={(e) => { ripple(e); startEdit(c); }} style={editBtnStyle}>Modifier</button>
                     </div>
                   </div>
                   <SignalChain current={c.statut} />
                   {c.mail && <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 2 }}>{c.mail}</div>}
                   {countFilled(parseConfig(c.configurationMaison), Object.values(FIELDS_CONFIG).flat().map(f => f.key)) > 0 && (
-                    <button className="askg-btn" onClick={() => setViewConfigId(c.id)} style={{ ...editBtnStyle, marginTop: 10, background: "rgba(122,95,199,.12)", color: "#B7A3E8" }}>🏠 Voir la configuration maison</button>
+                    <button className="askg-btn" onClick={(e) => { ripple(e); setViewConfigId(c.id); }} style={{ ...editBtnStyle, marginTop: 10, background: "rgba(122,95,199,.12)", color: "#B7A3E8" }}>🏠 Voir la configuration maison</button>
                   )}
                   {c.notes && <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 6, fontStyle: "italic" }}>{c.notes}</div>}
                   {c.statut === "rappeler" && (
@@ -872,20 +877,41 @@ function AgentApp({ agent, clients, allClients, agents, donneesRH, addClient, up
 // ============================================================
 // ESPACE COLLECTIF — vue lecture seule des statistiques de toute l'équipe
 // ============================================================
-function EspaceCollectif({ agents, allClients, agentActuelId }) {
+function EspaceCollectif({ agents, allClients, agentActuelId, donneesRH }) {
+  const moisActuel = todayISO().slice(0, 7);
+  const moisLabel = new Date(moisActuel + "-01").toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  const classement = agents
+    .map(a => {
+      const clientsAgent = allClients.filter(c => c.agentId === a.id);
+      const prime = calcPrimePerformance(a, clientsAgent, donneesRH, moisActuel);
+      const report = calcTotalAvecReport(a, clientsAgent, donneesRH, moisActuel);
+      return { agent: a, clientsAgent, prime, report };
+    })
+    .sort((x, y) => y.report.total - x.report.total);
+  const medailles = ["🥇", "🥈", "🥉"];
+
   return (
     <>
-      <PageHeader title="Espace collectif" subtitle="Suivi en direct de toute l'équipe — lecture seule" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-        {agents.map((a, ai) => {
-          const clientsAgent = allClients.filter(c => c.agentId === a.id);
+      <PageHeader title="Espace collectif" subtitle={`Suivi en direct de toute l'équipe et classement des primes de ${moisLabel} — lecture seule`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14 }}>
+        {classement.map(({ agent: a, clientsAgent, prime, report }, ai) => {
           const isMe = a.id === agentActuelId;
           return (
-            <div key={a.id} style={{ background: SURFACE, border: `1px solid ${isMe ? SIGNAL : LINE}`, borderRadius: 14, padding: 16, animation: "askgFadeUp .4s ease forwards", animationDelay: (ai * .06) + "s", opacity: 0 }}>
+            <div key={a.id} className="askg-kpi" style={{ background: SURFACE, border: `1px solid ${isMe ? SIGNAL : LINE}`, borderRadius: 14, padding: 16, animation: "askgFadeUp .4s ease forwards", animationDelay: (ai * .08) + "s", opacity: 0, position: "relative" }}>
+              {ai < 3 && <div style={{ position: "absolute", top: -10, right: 14, fontSize: 22, animation: "askgFloaty 3s ease-in-out infinite", animationDelay: (ai * .3) + "s" }}>{medailles[ai]}</div>}
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 8, background: isMe ? SIGNAL : "rgba(255,255,255,.08)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 12 }}>{a.nom.charAt(0)}</div>
                 <div style={{ fontWeight: 600, fontFamily: FONT_DISPLAY, color: TEXT, fontSize: 14 }}>{a.nom}{isMe && <span style={{ color: SIGNAL, fontSize: 10, fontWeight: 700 }}> · toi</span>}</div>
               </div>
+
+              <div style={{ background: "rgba(45,108,223,.1)", border: `1px solid ${SIGNAL}`, borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+                <div style={{ fontSize: 9, color: "#9CC0FF", textTransform: "uppercase", fontWeight: 700 }}>Primes de {moisLabel}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "white", fontFamily: FONT_DISPLAY, marginTop: 2 }}>{fmtUSD(report.total)}</div>
+                <div style={{ fontSize: 10.5, color: "#9CC0FF", marginTop: 2 }}>
+                  Basique {prime.primeBasiqueEligible ? "✓" : "✗"} · {fmtUSD(prime.totalSurprimesMois)} surprimes
+                </div>
+              </div>
+
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {STATUTS.map(s => (
                   <div key={s.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
@@ -932,27 +958,27 @@ function MesPrimesPage({ agent, allClients, donneesRH }) {
         <input type="month" value={mois} onChange={e => setMois(e.target.value)} style={{ background: SURFACE, border: `1px solid ${LINE}`, padding: "8px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: TEXT }} />
       </div>
 
-      <div style={{ background: p.primeVersee ? "rgba(15,169,143,.12)" : "rgba(196,130,30,.12)", border: `1px solid ${p.primeVersee ? "#0FA98F" : "#C4821E"}`, borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: p.primeVersee ? "#0FA98F" : "#C4821E", fontWeight: 600 }}>
+      <div style={{ background: p.primeVersee ? "rgba(15,169,143,.12)" : "rgba(196,130,30,.12)", border: `1px solid ${p.primeVersee ? "#0FA98F" : "#C4821E"}`, borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: p.primeVersee ? "#0FA98F" : "#C4821E", fontWeight: 600, animation: "askgFadeUp .4s ease" }}>
         {p.primeVersee ? `✓ Vous avez reçu l'intégralité de vos primes de ${moisLabel}` : `⏳ Vous n'avez pas encore reçu vos primes de ${moisLabel}`}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 20 }}>
-        <div style={{ background: SURFACE, border: `1px solid ${p.primeBasiqueEligible ? "#0FA98F" : LINE}`, borderRadius: 14, padding: 16, borderTop: `3px solid ${p.primeBasiqueEligible ? "#0FA98F" : "#3A3E4C"}` }}>
+        <div style={{ background: SURFACE, border: `1px solid ${p.primeBasiqueEligible ? "#0FA98F" : LINE}`, borderRadius: 14, padding: 16, borderTop: `3px solid ${p.primeBasiqueEligible ? "#0FA98F" : "#3A3E4C"}`, animation: "askgFadeUp .45s ease forwards", animationDelay: ".05s", opacity: 0 }}>
           <div style={{ fontSize: 9.5, color: TEXT_MUTED, textTransform: "uppercase", fontWeight: 700 }}>Prime basique</div>
           <div style={{ fontSize: 24, fontWeight: 700, marginTop: 5, color: p.primeBasiqueEligible ? "#0FA98F" : TEXT_MUTED, fontFamily: FONT_DISPLAY }}>{fmtUSD(p.primeBasique)}</div>
           <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.primeBasiqueEligible ? "🎉 Éligible ce mois-ci" : "Non éligible ce mois-ci"}</div>
         </div>
-        <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 14, padding: 16, borderTop: "3px solid #4FB8D9" }}>
+        <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 14, padding: 16, borderTop: "3px solid #4FB8D9", animation: "askgFadeUp .45s ease forwards", animationDelay: ".1s", opacity: 0 }}>
           <div style={{ fontSize: 9.5, color: TEXT_MUTED, textTransform: "uppercase", fontWeight: 700 }}>Surprimes de {moisLabel}</div>
           <div style={{ fontSize: 24, fontWeight: 700, marginTop: 5, color: "#4FB8D9", fontFamily: FONT_DISPLAY }}>{fmtUSD(p.totalSurprimesMois)}</div>
           <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.nbDocuments} documents · {p.nbInstalles} installations ce mois</div>
         </div>
-        <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 14, padding: 16, borderTop: "3px solid #7A5FC7" }}>
+        <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 14, padding: 16, borderTop: "3px solid #7A5FC7", animation: "askgFadeUp .45s ease forwards", animationDelay: ".15s", opacity: 0 }}>
           <div style={{ fontSize: 9.5, color: TEXT_MUTED, textTransform: "uppercase", fontWeight: 700 }}>Prime d'assiduité (RH)</div>
           <div style={{ fontSize: 24, fontWeight: 700, marginTop: 5, color: "#7A5FC7", fontFamily: FONT_DISPLAY }}>{fmtUSD(p.primeAssiduite)}</div>
           <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>Saisie par la Direction pour ce mois</div>
         </div>
-        <div style={{ background: "rgba(45,108,223,.1)", border: `1px solid ${SIGNAL}`, borderRadius: 14, padding: 16 }}>
+        <div style={{ background: "rgba(45,108,223,.1)", border: `1px solid ${SIGNAL}`, borderRadius: 14, padding: 16, animation: "askgFadeUp .45s ease forwards", animationDelay: ".2s", opacity: 0 }}>
           <div style={{ fontSize: 9.5, color: "#9CC0FF", textTransform: "uppercase", fontWeight: 700 }}>Total {report.moisEnRetard.length > 0 ? "dû" : "ce mois"}</div>
           <div style={{ fontSize: 26, fontWeight: 700, marginTop: 5, color: "white", fontFamily: FONT_DISPLAY }}>{fmtUSD(report.total)}</div>
           <div style={{ fontSize: 11, color: "#9CC0FF", marginTop: 2 }}>{report.moisEnRetard.length > 0 ? `Inclut l'arriéré de ${report.moisEnRetard.length} mois non versé(s)` : "Basique + surprimes + assiduité"}</div>
@@ -1003,7 +1029,7 @@ function AdminApp({ agents, clients, codes, donneesRH, setDonneeRH, setAgentCode
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           {navItems.map(([k, l]) => (
-            <button key={k} onClick={() => setPage(k)} style={{ border: "none", borderRadius: 99, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: page === k ? SIGNAL : "rgba(255,255,255,.05)", color: page === k ? "white" : TEXT_MUTED, transition: "all .2s ease" }}>{l}</button>
+            <button key={k} className="askg-btn" onClick={(e) => { ripple(e); setPage(k); }} style={{ border: "none", borderRadius: 99, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: page === k ? SIGNAL : "rgba(255,255,255,.05)", color: page === k ? "white" : TEXT_MUTED, transition: "background .2s ease, color .2s ease", position: "relative", overflow: "hidden" }}>{l}</button>
           ))}
           <button onClick={onLogout} style={{ background: "rgba(255,255,255,.06)", color: TEXT, border: `1px solid ${LINE}`, padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Déconnexion</button>
         </div>
@@ -1116,8 +1142,8 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
                     <Td><b>{c.nomClient}</b></Td>
                     <Td style={{ fontFamily: FONT_MONO }}>{c.telephone}</Td>
                     <Td>{c.produit}</Td>
-                    <Td><button className="askg-btn" onClick={() => setViewCoordId(c.id)} style={{ ...editBtnStyle, background: "rgba(45,108,223,.12)", color: "#9CC0FF" }}>📇 Voir</button></Td>
-                    <Td><button className="askg-btn" onClick={() => setViewConfigId(c.id)} style={{ ...editBtnStyle, background: "rgba(122,95,199,.12)", color: "#B7A3E8" }}>🏠 Voir</button></Td>
+                    <Td><button className="askg-btn" onClick={(e) => { ripple(e); setViewCoordId(c.id); }} style={{ ...editBtnStyle, background: "rgba(45,108,223,.12)", color: "#9CC0FF" }}>📇 Voir</button></Td>
+                    <Td><button className="askg-btn" onClick={(e) => { ripple(e); setViewConfigId(c.id); }} style={{ ...editBtnStyle, background: "rgba(122,95,199,.12)", color: "#B7A3E8" }}>🏠 Voir</button></Td>
                     <Td>{c.dateRdv ? new Date(c.dateRdv).toLocaleDateString("fr-FR") : "—"}</Td>
                     <Td>
                       <select value={c.statut} onChange={e => updateClient(c.id, { statut: e.target.value })} style={{ ...inputStyle, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color, fontWeight: 700 }}>
@@ -1144,7 +1170,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
                       {c.statut !== "rappeler" && c.statut !== "annule" && <span style={{ color: TEXT_MUTED }}>—</span>}
                     </Td>
                     <Td style={{ maxWidth: 160 }}>{c.notes}</Td>
-                    <Td><button className="askg-btn" onClick={() => removeClient(c.id)} style={delBtnStyle}>Suppr.</button></Td>
+                    <Td><button className="askg-btn" onClick={(e) => { ripple(e); removeClient(c.id); }} style={delBtnStyle}>Suppr.</button></Td>
                   </tr>
                 ))}
               </tbody>
@@ -1216,9 +1242,9 @@ function DonneesRHPage({ agents, donneesRH, setDonneeRH }) {
                     <span style={{ color: TEXT_MUTED, fontSize: 11 }}>$</span>
                   </div>
                 </Td>
-                <Td><button className="askg-btn" onClick={() => enregistrer(a.id)} style={primaryBtnStyle}>Enregistrer</button></Td>
+                <Td><button className="askg-btn" onClick={(e) => { ripple(e); enregistrer(a.id); }} style={primaryBtnStyle}>Enregistrer</button></Td>
                 <Td>
-                  <button className="askg-btn" onClick={() => toggleVersee(a.id, !versee)} style={{ ...editBtnStyle, background: versee ? "rgba(15,169,143,.14)" : "rgba(196,130,30,.14)", color: versee ? "#0FA98F" : "#C4821E" }}>
+                  <button className="askg-btn" onClick={(e) => { ripple(e); toggleVersee(a.id, !versee); }} style={{ ...editBtnStyle, background: versee ? "rgba(15,169,143,.14)" : "rgba(196,130,30,.14)", color: versee ? "#0FA98F" : "#C4821E" }}>
                     {versee ? "✓ Prime versée" : "⏳ Prime non versée"}
                   </button>
                 </Td>
@@ -1269,7 +1295,7 @@ function GestionAgentsPage({ agents, clients, addAgentEntry, removeAgentEntry })
               <option value="TN">🇹🇳 Tunisie</option>
             </select>
           </Field>
-          <button className="askg-btn" onClick={submit} style={primaryBtnStyle}>+ Ajouter</button>
+          <button className="askg-btn" onClick={(e) => { ripple(e); submit(); }} style={primaryBtnStyle}>+ Ajouter</button>
         </div>
       </Panel>
       <Panel title={`Tous les agents (${agents.length})`}>
@@ -1282,7 +1308,7 @@ function GestionAgentsPage({ agents, clients, addAgentEntry, removeAgentEntry })
                   <Td><b>{a.nom}</b></Td>
                   <Td>{a.poste}</Td>
                   <Td><span style={{ padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, background: a.localisation === "TN" ? "rgba(122,95,199,.14)" : "rgba(15,169,143,.14)", color: a.localisation === "TN" ? "#B7A3E8" : "#0FA98F" }}>{a.localisation === "TN" ? "🇹🇳 Tunisie" : "🇨🇩 RDC"}</span></Td>
-                  <Td><button className="askg-btn" onClick={() => retirer(a)} style={delBtnStyle}>Retirer</button></Td>
+                  <Td><button className="askg-btn" onClick={(e) => { ripple(e); retirer(a); }} style={delBtnStyle}>Retirer</button></Td>
                 </tr>
               ))}
             </tbody>
@@ -1314,7 +1340,7 @@ function CodesAgentsPage({ agents, codes, setAgentCode }) {
                 <Td><b>{a.nom}</b></Td>
                 <Td>{codeActuel(a.id) ? <b style={{ letterSpacing: 3, fontFamily: FONT_MONO }}>{codeActuel(a.id)}</b> : <span style={{ color: TEXT_MUTED }}>Aucun code défini</span>}</Td>
                 <Td><input type="text" maxLength={4} value={edits[a.id] || ""} onChange={e => setEdits(prev => ({ ...prev, [a.id]: e.target.value.replace(/\D/g, "") }))} placeholder="0000" style={{ ...inputStyle, width: 70, textAlign: "center", letterSpacing: 3, fontFamily: FONT_MONO }} /></Td>
-                <Td><button className="askg-btn" onClick={() => submit(a.id)} style={editBtnStyle}>{codeActuel(a.id) ? "Modifier" : "Créer"}</button></Td>
+                <Td><button className="askg-btn" onClick={(e) => { ripple(e); submit(a.id); }} style={editBtnStyle}>{codeActuel(a.id) ? "Modifier" : "Créer"}</button></Td>
               </tr>
             ))}
           </tbody>
@@ -1346,7 +1372,7 @@ function ParametresPage({ onChangePassword }) {
           <label style={labelStyle}>Confirme le nouveau mot de passe</label>
           <PasswordInput value={newPw2} onChange={e => setNewPw2(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
           {msg && <div style={{ fontSize: 12, color: msg.startsWith("✓") ? statutInfo("installe").color : "#E0656B", marginBottom: 10 }}>{msg}</div>}
-          <button className="askg-btn" onClick={submit} style={primaryBtnStyle}>Modifier le mot de passe</button>
+          <button className="askg-btn" onClick={(e) => { ripple(e); submit(); }} style={primaryBtnStyle}>Modifier le mot de passe</button>
         </div>
       </Panel>
     </>
