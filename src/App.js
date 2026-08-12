@@ -162,6 +162,7 @@ ${FONT_IMPORT}
 @keyframes askgPulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
 @keyframes askgCardIn { from { opacity:0; transform:translateY(22px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
 @keyframes askgFadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+@keyframes askgPageIn { from { opacity:0; transform:translateY(18px) scale(.99); } to { opacity:1; transform:translateY(0) scale(1); } }
 @keyframes askgSlideRight { from{opacity:0; transform:translateX(40px);} to{opacity:1; transform:translateX(0);} }
 @keyframes askgRowIn { from{opacity:0; transform:translateX(-10px);} to{opacity:1; transform:translateX(0);} }
 @keyframes askgRipple { to { transform:scale(3); opacity:0; } }
@@ -720,7 +721,7 @@ function AdminLoginScreen({ storedPw, onLogin, onBack }) {
         <label style={darkLabelStyle}>Mot de passe</label>
         <PasswordInput value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={darkInputStyle} autoFocus />
         {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
-        <button className="askg-btn" onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Déverrouiller</button>
+        <button className="askg-btn" onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Connexion</button>
         <button onClick={onBack} style={{ width: "100%", background: "none", color: TEXT_MUTED, border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
       </div>
     </AuthShell>
@@ -781,6 +782,7 @@ function AgentApp({ agent, clients, allClients, agents, donneesRH, addClient, up
       </div>
 
       <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
+        <div key={vue} style={{ animation: "askgPageIn .4s cubic-bezier(.16,1,.3,1)" }}>
         {vue === "collectif" ? (
           <EspaceCollectif agents={agents} allClients={allClients} agentActuelId={agent.id} />
         ) : vue === "primes" ? (
@@ -861,6 +863,7 @@ function AgentApp({ agent, clients, allClients, agents, donneesRH, addClient, up
         })()}
         </>
         )}
+        </div>
       </div>
     </div>
   );
@@ -1002,16 +1005,18 @@ function AdminApp({ agents, clients, codes, donneesRH, setDonneeRH, setAgentCode
           {navItems.map(([k, l]) => (
             <button key={k} onClick={() => setPage(k)} style={{ border: "none", borderRadius: 99, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: page === k ? SIGNAL : "rgba(255,255,255,.05)", color: page === k ? "white" : TEXT_MUTED, transition: "all .2s ease" }}>{l}</button>
           ))}
-          <button onClick={onLogout} style={{ background: "rgba(255,255,255,.06)", color: TEXT, border: `1px solid ${LINE}`, padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Verrouiller</button>
+          <button onClick={onLogout} style={{ background: "rgba(255,255,255,.06)", color: TEXT, border: `1px solid ${LINE}`, padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Déconnexion</button>
         </div>
       </div>
       <div style={{ padding: "24px 28px", maxWidth: 1300, margin: "0 auto", overflowX: "auto" }}>
-        {page === "dashboard" && <DashboardPage agents={agents} clients={clients} donneesRH={donneesRH} />}
-        {page === "clients" && <TousLesClientsPage agents={agents} clients={clients} updateClient={updateClient} removeClient={removeClient} />}
-        {page === "agents" && <GestionAgentsPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} />}
-        {page === "donneesrh" && <DonneesRHPage agents={agents} donneesRH={donneesRH} setDonneeRH={setDonneeRH} />}
-        {page === "codes" && <CodesAgentsPage agents={agents} codes={codes} setAgentCode={setAgentCode} />}
-        {page === "parametres" && <ParametresPage onChangePassword={onChangePassword} />}
+        <div key={page} style={{ animation: "askgPageIn .4s cubic-bezier(.16,1,.3,1)" }}>
+          {page === "dashboard" && <DashboardPage agents={agents} clients={clients} donneesRH={donneesRH} />}
+          {page === "clients" && <TousLesClientsPage agents={agents} clients={clients} updateClient={updateClient} removeClient={removeClient} />}
+          {page === "agents" && <GestionAgentsPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} />}
+          {page === "donneesrh" && <DonneesRHPage agents={agents} donneesRH={donneesRH} setDonneeRH={setDonneeRH} />}
+          {page === "codes" && <CodesAgentsPage agents={agents} codes={codes} setAgentCode={setAgentCode} />}
+          {page === "parametres" && <ParametresPage onChangePassword={onChangePassword} />}
+        </div>
       </div>
     </div>
   );
@@ -1043,8 +1048,8 @@ function DashboardPage({ agents, clients, donneesRH }) {
       <Panel title={`Performance par agent — primes de ${new Date(moisActuel + "-01").toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}`}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
           <thead><tr><Th>Agent</Th><Th>Total clients</Th><Th>Installés</Th><Th>Prime basique</Th><Th>Surprimes du mois</Th><Th>Total dû ce mois</Th></tr></thead>
-          <tbody>{parAgent.map(a => (
-            <tr key={a.id} className="askg-tbl-row" style={{ transition: "background .2s ease" }}>
+          <tbody>{parAgent.map((a, ai) => (
+            <tr key={a.id} className="askg-tbl-row" style={{ transition: "background .2s ease", animation: "askgRowIn .4s ease forwards", animationDelay: (ai * .07) + "s", opacity: 0 }}>
               <Td><b>{a.nom}</b></Td>
               <Td>{a.total}</Td>
               <Td style={{ color: statutInfo("installe").color }}><b>{a.installes}</b></Td>
