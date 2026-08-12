@@ -35,6 +35,48 @@ const STATUTS_CHAINE = STATUTS.filter(s => s.key !== "annule" && s.key !== "rapp
 function uid() { return Math.random().toString(36).slice(2, 10); }
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
+// ─── Champs fixes du formulaire client (définis par la Direction, non modifiables par l'agent) ───
+const FIELDS_COORDONNEES = [
+  { key: "nomClient", label: "Nom et Prénom" },
+  { key: "telephone", label: "Téléphone" },
+  { key: "adresse", label: "Adresse" },
+  { key: "mail", label: "Mail" },
+];
+const FIELDS_CONFIG = {
+  "GÉNÉRALITÉS": [
+    { key: "residencePrincipale", label: "Résidence principale" },
+    { key: "surfaceHabitable", label: "Surface habitable" },
+    { key: "modeChauffage", label: "Mode de chauffage" },
+    { key: "complementChauffage", label: "Complément de chauffage" },
+    { key: "emplacementChaudiere", label: "Emplacement de la chaudière" },
+    { key: "eauChaudeSanitaire", label: "Eau chaude des sanitaires" },
+    { key: "anneeConstruction", label: "Année de construction" },
+    { key: "compteMPR", label: "Compte MPR" },
+  ],
+  "DÉTAILS ISOLATION": [
+    { key: "combles", label: "Combles" },
+    { key: "sousSol", label: "Sous-sol" },
+    { key: "isolationExterieure", label: "Isolation extérieure" },
+    { key: "isolationInterieure", label: "Isolation intérieure" },
+    { key: "fenetres", label: "Fenêtres" },
+    { key: "vmc", label: "VMC" },
+  ],
+  "ACTEURS ÉNERGÉTIQUE": [
+    { key: "nombrePersonnes", label: "Nombre de personnes" },
+    { key: "nombreEnfants", label: "Nombre d'enfants à charge" },
+    { key: "revenuFiscal", label: "Revenu fiscal de référence" },
+    { key: "categorie", label: "Catégorie" },
+    { key: "ressentiClient", label: "Ressenti client" },
+    { key: "codeDossier", label: "Code du dossier" },
+  ],
+};
+const EMPTY_CONFIG = Object.values(FIELDS_CONFIG).flat().reduce((acc, f) => ({ ...acc, [f.key]: "" }), {});
+function parseConfig(str) {
+  try { return { ...EMPTY_CONFIG, ...(str ? JSON.parse(str) : {}) }; }
+  catch { return { ...EMPTY_CONFIG }; }
+}
+function countFilled(obj, keys) { return keys.filter(k => obj[k] && String(obj[k]).trim()).length; }
+
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');`;
 const FONT_DISPLAY = "'Poppins', sans-serif";
 const FONT_BODY = "'Inter', 'Segoe UI', sans-serif";
@@ -168,6 +210,62 @@ function Waveform({ pos }) {
   );
 }
 
+// ============================================================
+// MODAL — pop-up réutilisable pour Coordonnées / Configuration maison
+// ============================================================
+function Modal({ title, onClose, children }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "askgPulse .01s" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 16, width: 520, maxWidth: "100%", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 30px 80px rgba(0,0,0,.5)", animation: "askgCardIn .3s cubic-bezier(.16,1,.3,1)" }}>
+        <div style={{ position: "sticky", top: 0, background: SURFACE, padding: "16px 20px", borderBottom: `1px solid ${LINE}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2 style={{ fontSize: 15, margin: 0, fontWeight: 600, color: TEXT, fontFamily: FONT_DISPLAY }}>{title}</h2>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,.08)", border: "none", color: TEXT, width: 28, height: 28, borderRadius: 8, cursor: "pointer", fontSize: 14 }}>✕</button>
+        </div>
+        <div style={{ padding: 20 }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function CoordonneesModal({ values, onChange, onClose, readOnly }) {
+  return (
+    <Modal title="📇 Coordonnées client" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {FIELDS_COORDONNEES.map(f => (
+          <div key={f.key}>
+            <label style={darkLabelStyle}>{f.label}</label>
+            {readOnly
+              ? <div style={{ fontSize: 13, color: TEXT, padding: "8px 0" }}>{values[f.key] || <span style={{ color: TEXT_MUTED }}>—</span>}</div>
+              : <input type="text" value={values[f.key] || ""} onChange={e => onChange(f.key, e.target.value)} style={darkInputStyle} />}
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+function ConfigMaisonModal({ values, onChange, onClose, readOnly }) {
+  return (
+    <Modal title="🏠 Configuration de la maison" onClose={onClose}>
+      {Object.entries(FIELDS_CONFIG).map(([section, fields]) => (
+        <div key={section} style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#7A5FC7", letterSpacing: 1, textDecoration: "underline", textUnderlineOffset: 4, marginBottom: 12 }}>{section}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {fields.map(f => (
+              <div key={f.key}>
+                <label style={darkLabelStyle}>{f.label}</label>
+                {readOnly
+                  ? <div style={{ fontSize: 13, color: TEXT, padding: "8px 0" }}>{values[f.key] || <span style={{ color: TEXT_MUTED }}>—</span>}</div>
+                  : <input type="text" value={values[f.key] || ""} onChange={e => onChange(f.key, e.target.value)} style={darkInputStyle} />}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </Modal>
+  );
+}
+
 function SignalChain({ current }) {
   const isBranch = current === "annule" || current === "rappeler";
   const idx = isBranch ? STATUTS_CHAINE.length - 1 : STATUTS_CHAINE.findIndex(s => s.key === current);
@@ -226,9 +324,9 @@ export default function App() {
   }, []);
 
   async function addClient(form) {
-    const newRow = { id: uid(), agentId: agentConnecte.id, nomClient: form.nomClient, telephone: form.telephone, adresse: form.adresse, produit: form.produit, dateRdv: form.dateRdv, statut: "nouveau", notes: form.notes, configurationMaison: form.configurationMaison, created_at: new Date().toISOString() };
+    const newRow = { id: uid(), agentId: agentConnecte.id, nomClient: form.nomClient, telephone: form.telephone, adresse: form.adresse, mail: form.mail, produit: form.produit, dateRdv: form.dateRdv, statut: "nouveau", notes: form.notes, configurationMaison: form.configurationMaison, created_at: new Date().toISOString() };
     setClients(prev => [newRow, ...prev]);
-    await supabase.from("crm_clients").insert({ id: newRow.id, agent_id: newRow.agentId, nom_client: newRow.nomClient, telephone: newRow.telephone, adresse: newRow.adresse, produit: newRow.produit, date_rdv: newRow.dateRdv || null, statut: "nouveau", notes: newRow.notes, configuration_maison: newRow.configurationMaison });
+    await supabase.from("crm_clients").insert({ id: newRow.id, agent_id: newRow.agentId, nom_client: newRow.nomClient, telephone: newRow.telephone, adresse: newRow.adresse, mail: newRow.mail, produit: newRow.produit, date_rdv: newRow.dateRdv || null, statut: "nouveau", notes: newRow.notes, configuration_maison: newRow.configurationMaison });
   }
   async function updateClient(id, updates) {
     setClients(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
@@ -236,6 +334,7 @@ export default function App() {
     if ("nomClient" in updates) dbUpdates.nom_client = updates.nomClient;
     if ("telephone" in updates) dbUpdates.telephone = updates.telephone;
     if ("adresse" in updates) dbUpdates.adresse = updates.adresse;
+    if ("mail" in updates) dbUpdates.mail = updates.mail;
     if ("produit" in updates) dbUpdates.produit = updates.produit;
     if ("dateRdv" in updates) dbUpdates.date_rdv = updates.dateRdv || null;
     if ("statut" in updates) dbUpdates.statut = updates.statut;
@@ -440,24 +539,33 @@ function AdminLoginScreen({ storedPw, onLogin, onBack }) {
 // APPLICATION AGENT
 // ============================================================
 function AgentApp({ agent, clients, allClients, agents, addClient, updateClient, onLogout }) {
-  const emptyForm = { nomClient: "", telephone: "", adresse: "", produit: "", dateRdv: todayISO(), notes: "", configurationMaison: "" };
+  const emptyForm = { nomClient: "", telephone: "", adresse: "", mail: "", produit: "", dateRdv: todayISO(), notes: "" };
   const [form, setForm] = useState(emptyForm);
+  const [configData, setConfigData] = useState({ ...EMPTY_CONFIG });
   const [editingId, setEditingId] = useState(null);
   const [vue, setVue] = useState("perso");
+  const [modalOpen, setModalOpen] = useState(null); // null | "coord" | "config"
+  const [viewConfigId, setViewConfigId] = useState(null);
 
   function submit() {
     if (!form.nomClient || !form.telephone) return;
-    if (editingId) { updateClient(editingId, form); setEditingId(null); }
-    else { addClient(form); }
+    const payload = { ...form, configurationMaison: JSON.stringify(configData) };
+    if (editingId) { updateClient(editingId, payload); setEditingId(null); }
+    else { addClient(payload); }
     setForm(emptyForm);
+    setConfigData({ ...EMPTY_CONFIG });
   }
   function startEdit(c) {
-    setForm({ nomClient: c.nomClient, telephone: c.telephone, adresse: c.adresse || "", produit: c.produit || "", dateRdv: c.dateRdv || todayISO(), notes: c.notes || "", configurationMaison: c.configurationMaison || "" });
+    setForm({ nomClient: c.nomClient, telephone: c.telephone, adresse: c.adresse || "", mail: c.mail || "", produit: c.produit || "", dateRdv: c.dateRdv || todayISO(), notes: c.notes || "" });
+    setConfigData(parseConfig(c.configurationMaison));
     setEditingId(c.id);
   }
-  function cancelEdit() { setEditingId(null); setForm(emptyForm); }
+  function cancelEdit() { setEditingId(null); setForm(emptyForm); setConfigData({ ...EMPTY_CONFIG }); }
   const counts = {};
   STATUTS.forEach(s => { counts[s.key] = clients.filter(c => c.statut === s.key).length; });
+  const coordRemplis = countFilled(form, FIELDS_COORDONNEES.map(f => f.key));
+  const configRemplis = countFilled(configData, Object.values(FIELDS_CONFIG).flat().map(f => f.key));
+  const configTotal = Object.values(FIELDS_CONFIG).flat().length;
 
   return (
     <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT_BODY }}>
@@ -495,17 +603,19 @@ function AgentApp({ agent, clients, allClients, agents, addClient, updateClient,
 
         <Panel title={editingId ? "Modifier le client" : "Nouveau client / rendez-vous"} accent>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <Field label="Nom du client"><input type="text" value={form.nomClient} onChange={e => setForm({ ...form, nomClient: e.target.value })} style={{ ...inputStyle, width: 170 }} /></Field>
-            <Field label="Téléphone"><input type="text" value={form.telephone} onChange={e => setForm({ ...form, telephone: e.target.value })} style={{ ...inputStyle, width: 140, fontFamily: FONT_MONO }} /></Field>
-            <Field label="Adresse"><input type="text" value={form.adresse} onChange={e => setForm({ ...form, adresse: e.target.value })} style={{ ...inputStyle, width: 180 }} /></Field>
+            <button className="askg-btn" onClick={() => setModalOpen("coord")} style={{ ...ghostBtnStyle, borderColor: coordRemplis > 0 ? SIGNAL : LINE, color: coordRemplis > 0 ? "#9CC0FF" : TEXT_MUTED, padding: "12px 16px" }}>📇 Coordonnées client {coordRemplis > 0 && <span style={{ fontFamily: FONT_MONO, marginLeft: 4 }}>({coordRemplis}/{FIELDS_COORDONNEES.length})</span>}</button>
+            <button className="askg-btn" onClick={() => setModalOpen("config")} style={{ ...ghostBtnStyle, borderColor: configRemplis > 0 ? SIGNAL : LINE, color: configRemplis > 0 ? "#9CC0FF" : TEXT_MUTED, padding: "12px 16px" }}>🏠 Configuration de la maison {configRemplis > 0 && <span style={{ fontFamily: FONT_MONO, marginLeft: 4 }}>({configRemplis}/{configTotal})</span>}</button>
             <Field label="Produit / Service"><input type="text" value={form.produit} onChange={e => setForm({ ...form, produit: e.target.value })} style={{ ...inputStyle, width: 170 }} /></Field>
             <Field label="Date RDV"><input type="date" value={form.dateRdv} onChange={e => setForm({ ...form, dateRdv: e.target.value })} style={inputStyle} /></Field>
-            <Field label="Configuration de la maison"><input type="text" value={form.configurationMaison} onChange={e => setForm({ ...form, configurationMaison: e.target.value })} style={{ ...inputStyle, width: 220 }} /></Field>
-            <Field label="Notes"><input type="text" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} style={{ ...inputStyle, width: 180 }} /></Field>
+            <Field label="Commentaires / Notes"><input type="text" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} style={{ ...inputStyle, width: 180 }} /></Field>
             <button className="askg-btn" onClick={submit} style={primaryBtnStyle}>{editingId ? "Enregistrer" : "+ Ajouter"}</button>
             {editingId && <button className="askg-btn" onClick={cancelEdit} style={ghostBtnStyle}>Annuler</button>}
           </div>
+          {!form.nomClient && <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 10 }}>💡 Remplis au moins le nom et le téléphone dans "Coordonnées client" avant d'ajouter.</div>}
         </Panel>
+
+        {modalOpen === "coord" && <CoordonneesModal values={form} onChange={(k, v) => setForm({ ...form, [k]: v })} onClose={() => setModalOpen(null)} />}
+        {modalOpen === "config" && <ConfigMaisonModal values={configData} onChange={(k, v) => setConfigData({ ...configData, [k]: v })} onClose={() => setModalOpen(null)} />}
 
         <Panel title={`Mes clients (${clients.length})`}>
           {clients.length === 0 ? <EmptyState text="Aucun client enregistré pour l'instant." /> : (
@@ -527,7 +637,10 @@ function AgentApp({ agent, clients, allClients, agents, addClient, updateClient,
                     </div>
                   </div>
                   <SignalChain current={c.statut} />
-                  {c.configurationMaison && <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 10 }}><b style={{ color: TEXT }}>Configuration maison :</b> {c.configurationMaison}</div>}
+                  {c.mail && <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 2 }}>{c.mail}</div>}
+                  {countFilled(parseConfig(c.configurationMaison), Object.values(FIELDS_CONFIG).flat().map(f => f.key)) > 0 && (
+                    <button className="askg-btn" onClick={() => setViewConfigId(c.id)} style={{ ...editBtnStyle, marginTop: 10, background: "rgba(122,95,199,.12)", color: "#B7A3E8" }}>🏠 Voir la configuration maison</button>
+                  )}
                   {c.notes && <div style={{ fontSize: 12, color: TEXT_MUTED, marginTop: 6, fontStyle: "italic" }}>{c.notes}</div>}
                   {c.statut === "rappeler" && (
                     <div style={{ fontSize: 12, color: "#4FB8D9", marginTop: 10, background: "rgba(79,184,217,.1)", border: "1px solid rgba(79,184,217,.25)", borderRadius: 8, padding: "6px 10px" }}>
@@ -547,6 +660,10 @@ function AgentApp({ agent, clients, allClients, agents, addClient, updateClient,
         </Panel>
 
         <EnergyIcons />
+        {viewConfigId && (() => {
+          const c = clients.find(x => x.id === viewConfigId);
+          return c ? <ConfigMaisonModal values={parseConfig(c.configurationMaison)} onChange={() => {}} onClose={() => setViewConfigId(null)} readOnly /> : null;
+        })()}
         </>
         )}
       </div>
@@ -667,6 +784,7 @@ function DashboardPage({ agents, clients }) {
 function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
   const [filtreAgent, setFiltreAgent] = useState("tous");
   const [filtreStatut, setFiltreStatut] = useState("tous");
+  const [viewConfigId, setViewConfigId] = useState(null);
   function nomAgent(id) { const a = agents.find(x => x.id === id); return a ? a.nom : "?"; }
   const filtres = clients.filter(c => (filtreAgent === "tous" || c.agentId === filtreAgent) && (filtreStatut === "tous" || c.statut === filtreStatut));
 
@@ -693,15 +811,21 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
         {filtres.length === 0 ? <EmptyState text="Aucun client ne correspond à ces filtres." /> : (
           <div style={{ overflowX: "auto" }}>
             <table className="askg-tbl" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-              <thead><tr><Th>Client</Th><Th>Agent</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Date RDV</Th><Th>Statut</Th><Th>Détails (rappel / raison)</Th><Th>Notes</Th><Th></Th></tr></thead>
+              <thead><tr><Th>Client</Th><Th>Agent</Th><Th>Téléphone</Th><Th>Mail</Th><Th>Produit</Th><Th>Date RDV</Th><Th>Config. maison</Th><Th>Statut</Th><Th>Détails (rappel / raison)</Th><Th>Notes</Th><Th></Th></tr></thead>
               <tbody>
                 {filtres.map((c, i) => (
                   <tr key={c.id} className="askg-tbl-row" style={{ transition: "background .2s ease", animation: "askgRowIn .4s ease forwards", animationDelay: Math.min(i * .04, .3) + "s", opacity: 0 }}>
                     <Td><b>{c.nomClient}</b></Td>
                     <Td>{nomAgent(c.agentId)}</Td>
                     <Td style={{ fontFamily: FONT_MONO }}>{c.telephone}</Td>
+                    <Td>{c.mail}</Td>
                     <Td>{c.produit}</Td>
                     <Td>{c.dateRdv ? new Date(c.dateRdv).toLocaleDateString("fr-FR") : "—"}</Td>
+                    <Td>
+                      {countFilled(parseConfig(c.configurationMaison), Object.values(FIELDS_CONFIG).flat().map(f => f.key)) > 0
+                        ? <button className="askg-btn" onClick={() => setViewConfigId(c.id)} style={{ ...editBtnStyle, background: "rgba(122,95,199,.12)", color: "#B7A3E8" }}>🏠 Voir</button>
+                        : <span style={{ color: TEXT_MUTED }}>—</span>}
+                    </Td>
                     <Td>
                       <select value={c.statut} onChange={e => updateClient(c.id, { statut: e.target.value })} style={{ ...inputStyle, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color, fontWeight: 700 }}>
                         {STATUTS.map(s => <option key={s.key} value={s.key} style={{ background: SURFACE, color: TEXT }}>{s.label}</option>)}
@@ -728,6 +852,10 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
           </div>
         )}
       </Panel>
+      {viewConfigId && (() => {
+        const c = clients.find(x => x.id === viewConfigId);
+        return c ? <ConfigMaisonModal values={parseConfig(c.configurationMaison)} onChange={() => {}} onClose={() => setViewConfigId(null)} readOnly /> : null;
+      })()}
     </>
   );
 }
