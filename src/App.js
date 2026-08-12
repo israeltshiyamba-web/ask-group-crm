@@ -213,6 +213,30 @@ function Waveform({ pos }) {
 // ============================================================
 // MODAL — pop-up réutilisable pour Coordonnées / Configuration maison
 // ============================================================
+function PasswordInput({ value, onChange, placeholder, style, onKeyDown, autoFocus, centered }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        autoComplete="new-password"
+        style={{ ...style, width: "100%", boxSizing: "border-box", paddingRight: 38 }}
+      />
+      <button
+        type="button"
+        onClick={() => setShow(s => !s)}
+        tabIndex={-1}
+        style={{ position: "absolute", right: centered ? 12 : 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: TEXT_MUTED, fontSize: 15, padding: 4 }}
+      >{show ? "🙈" : "👁"}</button>
+    </div>
+  );
+}
+
 function Modal({ title, onClose, children }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "askgPulse .01s" }}>
@@ -428,6 +452,16 @@ export default function App() {
       await supabase.from("crm_agent_codes").insert({ agent_id: agentId, code });
     }
   }
+  async function addAgentEntry(nom, poste, localisation) {
+    const newAgent = { id: uid(), nom, poste, localisation };
+    setAgents(prev => [...prev, newAgent]);
+    await supabase.from("agents").insert(newAgent);
+  }
+  async function removeAgentEntry(id) {
+    setAgents(prev => prev.filter(a => a.id !== id));
+    await supabase.from("crm_agent_codes").delete().eq("agent_id", id);
+    await supabase.from("agents").delete().eq("id", id);
+  }
   async function handleAdminSetup(pw) {
     await supabase.from("app_passwords").insert({ app_name: APP_NAME_ADMIN, password: pw });
     setAdminStoredPw(pw);
@@ -471,7 +505,7 @@ export default function App() {
     return <AgentApp agent={agentConnecte} clients={clients.filter(c => c.agentId === agentConnecte.id)} allClients={clients} agents={agents} addClient={addClient} updateClient={updateClient} onLogout={() => setAgentConnecte(null)} />;
   }
   if (mode === "admin" && adminConnecte) {
-    return <AdminApp agents={agents} clients={clients} codes={codes} setAgentCode={setAgentCode} updateClient={updateClient} removeClient={removeClient} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
+    return <AdminApp agents={agents} clients={clients} codes={codes} setAgentCode={setAgentCode} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} updateClient={updateClient} removeClient={removeClient} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
   }
   return null;
 }
@@ -552,7 +586,7 @@ function AgentLoginScreen({ onLogin, onBack }) {
         <div style={{ fontSize: 11, letterSpacing: 3, color: TEXT_MUTED, fontWeight: 600, textAlign: "center", fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
         <h1 style={{ fontSize: 19, textAlign: "center", color: TEXT, margin: "10px 0 22px", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>Connexion Agent</h1>
         <label style={darkLabelStyle}>Ton code personnel</label>
-        <input type="password" inputMode="numeric" maxLength={4} value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={{ ...darkInputStyle, textAlign: "center", fontSize: 26, letterSpacing: 10, fontFamily: FONT_MONO }} placeholder="••••" autoFocus />
+        <PasswordInput value={code} onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 4))} onKeyDown={e => e.key === "Enter" && submit()} style={{ ...darkInputStyle, textAlign: "center", fontSize: 26, letterSpacing: 10, fontFamily: FONT_MONO }} placeholder="••••" autoFocus centered />
         {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
         <button className="askg-btn" onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Se connecter</button>
         <button onClick={onBack} style={{ width: "100%", background: "none", color: TEXT_MUTED, border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
@@ -575,9 +609,9 @@ function AdminSetupScreen({ onSubmit, onBack }) {
         <h1 style={{ fontSize: 19, textAlign: "center", color: TEXT, margin: "10px 0 4px", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>Première utilisation Direction</h1>
         <p style={{ fontSize: 12.5, color: TEXT_MUTED, textAlign: "center", marginBottom: 22 }}>Crée le mot de passe Admin. Tu seras le seul à le connaître.</p>
         <label style={darkLabelStyle}>Nouveau mot de passe</label>
-        <input type="password" value={pw} onChange={e => setPw(e.target.value)} style={darkInputStyle} placeholder="Au moins 4 caractères" />
+        <PasswordInput value={pw} onChange={e => setPw(e.target.value)} style={darkInputStyle} placeholder="Au moins 4 caractères" />
         <label style={{ ...darkLabelStyle, marginTop: 12 }}>Confirme le mot de passe</label>
-        <input type="password" value={pw2} onChange={e => setPw2(e.target.value)} style={darkInputStyle} />
+        <PasswordInput value={pw2} onChange={e => setPw2(e.target.value)} style={darkInputStyle} />
         {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
         <button className="askg-btn" onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Créer mon accès Admin</button>
         <button onClick={onBack} style={{ width: "100%", background: "none", color: TEXT_MUTED, border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
@@ -595,7 +629,7 @@ function AdminLoginScreen({ storedPw, onLogin, onBack }) {
         <div style={{ fontSize: 11, letterSpacing: 3, color: TEXT_MUTED, fontWeight: 600, textAlign: "center", fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
         <h1 style={{ fontSize: 19, textAlign: "center", color: TEXT, margin: "10px 0 22px", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>Accès Direction</h1>
         <label style={darkLabelStyle}>Mot de passe</label>
-        <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={darkInputStyle} autoFocus />
+        <PasswordInput value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={darkInputStyle} autoFocus />
         {error && <div style={{ color: "#F0888D", fontSize: 12, marginTop: 10 }}>{error}</div>}
         <button className="askg-btn" onClick={submit} style={{ width: "100%", background: SIGNAL, color: "white", border: "none", padding: 13, borderRadius: 10, fontWeight: 600, fontSize: 14, marginTop: 20, cursor: "pointer", fontFamily: FONT_DISPLAY }}>Déverrouiller</button>
         <button onClick={onBack} style={{ width: "100%", background: "none", color: TEXT_MUTED, border: "none", padding: 10, fontSize: 12, marginTop: 4, cursor: "pointer" }}>← Retour</button>
@@ -780,9 +814,9 @@ function EspaceCollectif({ agents, allClients, agentActuelId }) {
 // ============================================================
 // APPLICATION ADMIN
 // ============================================================
-function AdminApp({ agents, clients, codes, setAgentCode, updateClient, removeClient, onChangePassword, onLogout }) {
+function AdminApp({ agents, clients, codes, setAgentCode, addAgentEntry, removeAgentEntry, updateClient, removeClient, onChangePassword, onLogout }) {
   const [page, setPage] = useState("dashboard");
-  const navItems = [["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["codes", "Codes agents"], ["parametres", "Paramètres"]];
+  const navItems = [["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["agents", "Gestion des agents"], ["codes", "Codes agents"], ["parametres", "Paramètres"]];
   return (
     <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT_BODY }}>
       <style>{GLOBAL_CSS}</style>
@@ -804,6 +838,7 @@ function AdminApp({ agents, clients, codes, setAgentCode, updateClient, removeCl
       <div style={{ padding: "24px 28px", maxWidth: 1300, margin: "0 auto", overflowX: "auto" }}>
         {page === "dashboard" && <DashboardPage agents={agents} clients={clients} />}
         {page === "clients" && <TousLesClientsPage agents={agents} clients={clients} updateClient={updateClient} removeClient={removeClient} />}
+        {page === "agents" && <GestionAgentsPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} />}
         {page === "codes" && <CodesAgentsPage agents={agents} codes={codes} setAgentCode={setAgentCode} />}
         {page === "parametres" && <ParametresPage onChangePassword={onChangePassword} />}
       </div>
@@ -925,6 +960,69 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
   );
 }
 
+// ============================================================
+// GESTION DES AGENTS — ajout / suppression, directement depuis le CRM
+// (même liste d'agents que le logiciel RH — partagée)
+// ============================================================
+function GestionAgentsPage({ agents, clients, addAgentEntry, removeAgentEntry }) {
+  const [nom, setNom] = useState("");
+  const [poste, setPoste] = useState("Agent de téléprospection");
+  const [localisation, setLocalisation] = useState("RDC");
+
+  function submit() {
+    if (!nom.trim()) return;
+    addAgentEntry(nom.trim(), poste, localisation);
+    setNom("");
+  }
+  function retirer(a) {
+    const nbClients = clients.filter(c => c.agentId === a.id).length;
+    const msg = nbClients > 0
+      ? `${a.nom} a ${nbClients} client(s) enregistré(s) dans le CRM. Le supprimer ici le retirera aussi du logiciel RH. Continuer ?`
+      : `Retirer ${a.nom} ? Cela le retirera aussi du logiciel RH.`;
+    if (window.confirm(msg)) removeAgentEntry(a.id);
+  }
+
+  return (
+    <>
+      <PageHeader title="Gestion des agents" subtitle="Liste partagée avec le Suivi RH — toute modification ici s'applique aussi là-bas" />
+      <Panel title="Ajouter un agent" accent>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <Field label="Nom complet"><input type="text" value={nom} onChange={e => setNom(e.target.value)} style={{ ...inputStyle, width: 200 }} /></Field>
+          <Field label="Poste">
+            <select value={poste} onChange={e => setPoste(e.target.value)} style={{ ...inputStyle, width: 200 }}>
+              {["Agent de téléprospection", "Gérant local délégué", "Responsable production", "Technicien informatique", "Comptable/RH", "Avocat", "Autre"].map(p => <option key={p}>{p}</option>)}
+            </select>
+          </Field>
+          <Field label="Localisation">
+            <select value={localisation} onChange={e => setLocalisation(e.target.value)} style={inputStyle}>
+              <option value="RDC">🇨🇩 Kinshasa — RDC</option>
+              <option value="TN">🇹🇳 Tunisie</option>
+            </select>
+          </Field>
+          <button className="askg-btn" onClick={submit} style={primaryBtnStyle}>+ Ajouter</button>
+        </div>
+      </Panel>
+      <Panel title={`Tous les agents (${agents.length})`}>
+        {agents.length === 0 ? <EmptyState text="Aucun agent enregistré." /> : (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+            <thead><tr><Th>Nom</Th><Th>Poste</Th><Th>Localisation</Th><Th></Th></tr></thead>
+            <tbody>
+              {agents.map(a => (
+                <tr key={a.id} className="askg-tbl-row" style={{ transition: "background .2s ease" }}>
+                  <Td><b>{a.nom}</b></Td>
+                  <Td>{a.poste}</Td>
+                  <Td><span style={{ padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, background: a.localisation === "TN" ? "rgba(122,95,199,.14)" : "rgba(15,169,143,.14)", color: a.localisation === "TN" ? "#B7A3E8" : "#0FA98F" }}>{a.localisation === "TN" ? "🇹🇳 Tunisie" : "🇨🇩 RDC"}</span></Td>
+                  <Td><button className="askg-btn" onClick={() => retirer(a)} style={delBtnStyle}>Retirer</button></Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Panel>
+    </>
+  );
+}
+
 function CodesAgentsPage({ agents, codes, setAgentCode }) {
   const [edits, setEdits] = useState({});
   function codeActuel(agentId) { const c = codes.find(x => x.agentId === agentId); return c ? c.code : ""; }
@@ -972,11 +1070,11 @@ function ParametresPage({ onChangePassword }) {
       <Panel title="Changer le mot de passe Admin">
         <div style={{ maxWidth: 320 }}>
           <label style={labelStyle}>Mot de passe actuel</label>
-          <input type="password" value={oldPw} onChange={e => setOldPw(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 10 }} />
+          <PasswordInput value={oldPw} onChange={e => setOldPw(e.target.value)} style={{ ...inputStyle, marginBottom: 10 }} />
           <label style={labelStyle}>Nouveau mot de passe</label>
-          <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 10 }} />
+          <PasswordInput value={newPw} onChange={e => setNewPw(e.target.value)} style={{ ...inputStyle, marginBottom: 10 }} />
           <label style={labelStyle}>Confirme le nouveau mot de passe</label>
-          <input type="password" value={newPw2} onChange={e => setNewPw2(e.target.value)} style={{ ...inputStyle, width: "100%", marginBottom: 14 }} />
+          <PasswordInput value={newPw2} onChange={e => setNewPw2(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
           {msg && <div style={{ fontSize: 12, color: msg.startsWith("✓") ? statutInfo("installe").color : "#E0656B", marginBottom: 10 }}>{msg}</div>}
           <button className="askg-btn" onClick={submit} style={primaryBtnStyle}>Modifier le mot de passe</button>
         </div>
