@@ -163,6 +163,9 @@ ${FONT_IMPORT}
 @keyframes askgCardIn { from { opacity:0; transform:translateY(22px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
 @keyframes askgFadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
 @keyframes askgPageIn { from { opacity:0; transform:translateY(18px) scale(.99); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes askgRevealUp { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+@keyframes askgKateIn { 0% { opacity:0; transform:translateY(30px) scale(.85); letter-spacing:14px; } 60% { opacity:1; } 100% { opacity:1; transform:translateY(0) scale(1); letter-spacing:2px; } }
+@keyframes askgBob { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
 @keyframes askgSlideRight { from{opacity:0; transform:translateX(40px);} to{opacity:1; transform:translateX(0);} }
 @keyframes askgRowIn { from{opacity:0; transform:translateX(-10px);} to{opacity:1; transform:translateX(0);} }
 @keyframes askgRipple { to { transform:scale(3); opacity:0; } }
@@ -210,6 +213,43 @@ function ripple(e) {
 // ============================================================
 // COMPOSANT — Illustration agente (casque, sans traits de visage)
 // ============================================================
+// ============================================================
+// COMPOSANT — Plateau de centre d'appel (silhouette animée, fond de l'écran Kate)
+// ============================================================
+function CallFloorIllustration() {
+  const positions = [
+    { x: 155, y: 222, hc: SIGNAL, delay: "0s" },
+    { x: 375, y: 212, hc: "#7A5FC7", delay: ".6s" },
+    { x: 625, y: 227, hc: "#0FA98F", delay: "1.1s" },
+    { x: 855, y: 214, hc: "#4FB8D9", delay: ".3s" },
+    { x: 1055, y: 230, hc: SIGNAL, delay: ".85s" },
+  ];
+  return (
+    <svg viewBox="0 0 1200 300" preserveAspectRatio="xMidYMax slice" width="100%" height="100%" style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "38%", opacity: .32 }}>
+      <defs>
+        <g id="askgAgentFig">
+          <rect x="-42" y="30" width="84" height="20" rx="4" fill="#12141A" />
+          <rect x="-30" y="-4" width="60" height="36" rx="6" fill={SURFACE} />
+          <rect x="-25" y="-1" width="50" height="24" rx="3" fill="#161822" />
+          <circle cx="0" cy="-32" r="24" fill="#241925" />
+          <path d="M-20 -36 Q-24 -62 0 -68 Q24 -62 20 -36" fill="none" stroke="var(--hc)" strokeWidth="5" strokeLinecap="round" />
+          <circle cx="-22" cy="-34" r="7" fill="var(--hc)" />
+          <circle cx="22" cy="-34" r="7" fill="var(--hc)" />
+          <path d="M22 -28 Q30 -18 22 -8 L16 -3" fill="none" stroke="var(--hc)" strokeWidth="4" strokeLinecap="round" />
+          <circle cx="15" cy="-2" r="4" fill="var(--hc)" />
+        </g>
+      </defs>
+      {positions.map((p, i) => (
+        <g key={i} transform={`translate(${p.x},${p.y})`}>
+          <g style={{ animation: `askgBob 3.4s ease-in-out infinite`, animationDelay: p.delay, "--hc": p.hc }}>
+            <use href="#askgAgentFig" />
+          </g>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 function AgentIllustration({ size = 220 }) {
   return (
     <div style={{ width: size, height: size, position: "relative" }}>
@@ -462,6 +502,7 @@ function SignalChain({ current }) {
 
 export default function App() {
   const [mode, setMode] = useState(null);
+  const [splashDone, setSplashDone] = useState(false);
   const [agents, setAgents] = useState([]);
   const [clients, setClients] = useState([]);
   const [codes, setCodes] = useState([]);
@@ -589,6 +630,7 @@ export default function App() {
     );
   }
 
+  if (!mode && !splashDone) return <SplashKate onCommencer={() => setSplashDone(true)} />;
   if (!mode) return <ChoixModeScreen onChoose={setMode} />;
   if (mode === "agent" && !agentConnecte) return <AgentLoginScreen onLogin={handleAgentLogin} onBack={() => setMode(null)} />;
   if (mode === "admin" && !adminConnecte) {
@@ -607,6 +649,46 @@ export default function App() {
 // ============================================================
 // ÉCRAN DE CHOIX INITIAL
 // ============================================================
+// ============================================================
+// ÉCRAN "BIENVENUE DANS KATE" — diapositive d'ouverture, une fois par session
+// ============================================================
+function SplashKate({ onCommencer }) {
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: BG, fontFamily: FONT_BODY, position: "relative", overflow: "hidden" }}>
+      <style>{GLOBAL_CSS}</style>
+      <BgGlow />
+      <CallFloorIllustration />
+      <div style={{ position: "relative", zIndex: 2, textAlign: "center", padding: 20 }}>
+        <div style={{ fontFamily: FONT_MONO, fontSize: 12, letterSpacing: 4, color: TEXT_MUTED, fontWeight: 600, opacity: 0, animation: "askgRevealUp 1s ease forwards", animationDelay: ".6s" }}>
+          <span style={{ width: 8, height: 8, borderRadius: 99, background: SIGNAL, display: "inline-block", marginRight: 8, boxShadow: `0 0 12px ${SIGNAL}`, animation: "askgPulse 1.6s ease-in-out infinite", verticalAlign: "middle" }} />
+          ASK GROUP SARL
+        </div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 500, color: "#C7CCDA", marginTop: 14, letterSpacing: 1, opacity: 0, animation: "askgRevealUp 1.2s cubic-bezier(.16,1,.3,1) forwards", animationDelay: "1.8s" }}>
+          Bienvenue dans
+        </div>
+        <div style={{
+          fontFamily: FONT_DISPLAY, fontSize: "clamp(64px, 12vw, 110px)", fontWeight: 800, marginTop: 6, letterSpacing: 2,
+          background: "linear-gradient(120deg, #2D6CDF, #4FB8D9 40%, #7A5FC7 80%)",
+          WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+          filter: "drop-shadow(0 0 40px rgba(45,108,223,.35))",
+          opacity: 0, animation: "askgKateIn 2.6s cubic-bezier(.16,1,.3,1) forwards", animationDelay: "3.2s",
+        }}>
+          Kate
+        </div>
+        <div style={{ fontFamily: FONT_BODY, fontSize: 14, color: TEXT_MUTED, marginTop: 18, opacity: 0, animation: "askgRevealUp 1s ease forwards", animationDelay: "5.6s" }}>
+          Ensemble on performe, ensemble on va plus loin.
+        </div>
+        <div style={{ marginTop: 42, opacity: 0, animation: "askgRevealUp 1.2s cubic-bezier(.16,1,.3,1) forwards", animationDelay: "6.6s" }}>
+          <button
+            onClick={(e) => { ripple(e); onCommencer(); }}
+            style={{ position: "relative", overflow: "hidden", background: SIGNAL, color: "white", border: "none", padding: "16px 46px", borderRadius: 99, fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 15, cursor: "pointer", boxShadow: "0 14px 38px rgba(45,108,223,.45)", transition: "transform .2s ease, box-shadow .2s ease" }}
+          >Commencer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ChoixModeScreen({ onChoose }) {
   const [hover, setHover] = useState("agent");
   return (
@@ -623,7 +705,7 @@ function ChoixModeScreen({ onChoose }) {
             <span style={{ width: 7, height: 7, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 10px ${SIGNAL}`, animation: "askgPulse 1.6s ease-in-out infinite" }} />
             <div style={{ fontSize: 11, letterSpacing: 3, color: TEXT_MUTED, fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP SARL</div>
           </div>
-          <h1 style={{ fontSize: 24, color: TEXT, margin: "8px 0 2px", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>CRM Ask Group</h1>
+          <h1 style={{ fontSize: 24, color: TEXT, margin: "8px 0 2px", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>CRM Kate</h1>
           <p style={{ fontSize: 12, color: TEXT_MUTED, margin: "0 0 26px" }}>Suivi des rendez-vous, en direct</p>
           <button
             className="askg-btn"
@@ -787,7 +869,7 @@ function AgentApp({ agent, clients, allClients, agents, donneesRH, addClient, up
       </div>
 
       <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
-        <div key={vue} style={{ animation: "askgPageIn .4s cubic-bezier(.16,1,.3,1)" }}>
+        <div key={vue} style={{ animation: "askgPageIn 3.5s cubic-bezier(.16,1,.3,1)" }}>
         {vue === "collectif" ? (
           <EspaceCollectif agents={agents} allClients={allClients} agentActuelId={agent.id} donneesRH={donneesRH} />
         ) : vue === "primes" ? (
@@ -1035,7 +1117,7 @@ function AdminApp({ agents, clients, codes, donneesRH, setDonneeRH, setAgentCode
         </div>
       </div>
       <div style={{ padding: "24px 28px", maxWidth: 1300, margin: "0 auto", overflowX: "auto" }}>
-        <div key={page} style={{ animation: "askgPageIn .4s cubic-bezier(.16,1,.3,1)" }}>
+        <div key={page} style={{ animation: "askgPageIn 3.5s cubic-bezier(.16,1,.3,1)" }}>
           {page === "dashboard" && <DashboardPage agents={agents} clients={clients} donneesRH={donneesRH} />}
           {page === "clients" && <TousLesClientsPage agents={agents} clients={clients} updateClient={updateClient} removeClient={removeClient} />}
           {page === "agents" && <GestionAgentsPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} />}
