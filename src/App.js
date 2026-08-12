@@ -88,16 +88,23 @@ const SURPRIME_DOCUMENTS = 5;
 const SURPRIME_INSTALLATION = 50;
 
 function mkOf(d) { return (d || "1970-01-01").slice(0, 7); }
+function prevMonthKey(mk) {
+  const [y, m] = mk.split("-").map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
 
+// Calcule les primes d'UN SEUL mois donné (sans tenir compte des mois non versés précédents)
 function calcPrimePerformance(agent, tousLesClientsAgent, donneesRH, mk) {
   const clientsDuMois = tousLesClientsAgent.filter(c => mkOf(c.created_at) === mk);
   const nbRdv = clientsDuMois.length;
   const juges = clientsDuMois.filter(c => c.qualite === "valide" || c.qualite === "non_valide");
   const valides = clientsDuMois.filter(c => c.qualite === "valide");
   const tauxQualite = juges.length > 0 ? (valides.length / juges.length) * 100 : 0;
-  const donnee = donneesRH.find(d => d.agentId === agent.id && d.mois === mk) || { pourcentageTempsTravaille: 0, primeAssiduite: 0 };
+  const donnee = donneesRH.find(d => d.agentId === agent.id && d.mois === mk) || { pourcentageTempsTravaille: 0, primeAssiduite: 0, primeVersee: false };
   const ratioTravail = donnee.pourcentageTempsTravaille || 0;
   const primeAssiduite = donnee.primeAssiduite || 0;
+  const primeVersee = !!donnee.primeVersee;
 
   const cond1 = nbRdv >= 18;
   const cond2 = juges.length > 0 && tauxQualite >= 80;
@@ -105,25 +112,41 @@ function calcPrimePerformance(agent, tousLesClientsAgent, donneesRH, mk) {
   const primeBasiqueEligible = cond1 && cond2 && cond3;
   const primeBasique = primeBasiqueEligible ? PRIME_BASIQUE_MONTANT : 0;
 
-  // Surprimes : cumul depuis toujours (tous les clients de l'agent, indépendamment du mois)
-  const idxDocuments = STATUTS_CHAINE.findIndex(s => s.key === "documents");
-  const aAtteintDocuments = c => STATUTS_CHAINE.findIndex(s => s.key === c.statut) >= idxDocuments;
-  const estInstalle = c => c.statut === "installe";
-  const nbDocuments = tousLesClientsAgent.filter(aAtteintDocuments).length;
-  const nbInstalles = tousLesClientsAgent.filter(estInstalle).length;
+  // Surprimes DU MOIS : basées sur la date exacte du changement de statut (pas la date du rendez-vous)
+  const nbDocuments = tousLesClientsAgent.filter(c => c.documentsDate && mkOf(c.documentsDate) === mk).length;
+  const nbInstalles = tousLesClientsAgent.filter(c => c.installeDate && mkOf(c.installeDate) === mk).length;
   const surprimeDocuments = nbDocuments * SURPRIME_DOCUMENTS;
   const surprimeInstallation = nbInstalles * SURPRIME_INSTALLATION;
+  const totalSurprimesMois = surprimeDocuments + surprimeInstallation;
+  const totalMoisPropre = primeBasique + totalSurprimesMois + primeAssiduite;
 
   return {
     nbRdv, tauxQualite, juges: juges.length, valides: valides.length, ratioTravail,
     cond1, cond2, cond3, primeBasiqueEligible, primeBasique,
-    nbDocuments, surprimeDocuments, nbInstalles, surprimeInstallation,
-    totalSurprimes: surprimeDocuments + surprimeInstallation,
-    totalPrimePerformance: primeBasique + surprimeDocuments + surprimeInstallation,
-    primeAssiduite,
+    nbDocuments, surprimeDocuments, nbInstalles, surprimeInstallation, totalSurprimesMois,
+    primeAssiduite, primeVersee, totalMoisPropre,
   };
 }
 
+// Total réellement dû pour le mois consulté = son propre total + tout arriéré des mois
+// précédents non encore marqués "versés" (s'arrête dès qu'un mois versé est rencontré)
+function calcTotalAvecReport(agent, tousLesClientsAgent, donneesRH, mk) {
+  let total = 0;
+  const moisEnRetard = [];
+  let cursor = mk;
+  for (let i = 0; i < 24; i++) {
+    const p = calcPrimePerformance(agent, tousLesClientsAgent, donneesRH, cursor);
+    if (i === 0) {
+      total += p.totalMoisPropre;
+    } else {
+      if (p.primeVersee) break;
+      total += p.totalMoisPropre;
+      if (p.totalMoisPropre > 0) moisEnRetard.push(cursor);
+    }
+    cursor = prevMonthKey(cursor);
+  }
+  return { total, moisEnRetard };
+}
 
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');`;
 const FONT_DISPLAY = "'Poppins', sans-serif";
@@ -455,11 +478,11 @@ export default function App() {
         supabase.from("crm_donnees_rh_mensuelles").select("*"),
       ]);
       if (a.data) setAgents(a.data);
-      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, rappelCommentaire: x.rappel_commentaire, configurationMaison: x.configuration_maison, qualite: x.qualite })));
+      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, rappelCommentaire: x.rappel_commentaire, configurationMaison: x.configuration_maison, qualite: x.qualite, documentsDate: x.documents_date, installeDate: x.installe_date })));
       if (cd.data) setCodes(cd.data.map(x => ({ ...x, agentId: x.agent_id })));
       if (pw.data) setAdminStoredPw(pw.data.password);
       else setAdminSetupMode(true);
-      if (rh.data) setDonneesRH(rh.data.map(x => ({ agentId: x.agent_id, mois: x.mois, pourcentageTempsTravaille: x.pourcentage_temps_travaille, primeAssiduite: x.prime_assiduite })));
+      if (rh.data) setDonneesRH(rh.data.map(x => ({ agentId: x.agent_id, mois: x.mois, pourcentageTempsTravaille: x.pourcentage_temps_travaille, primeAssiduite: x.prime_assiduite, primeVersee: x.prime_versee })));
       setLoaded(true);
     }
     loadAll();
@@ -473,20 +496,29 @@ export default function App() {
     await supabase.from("crm_clients").insert({ id: newRow.id, agent_id: newRow.agentId, nom_client: newRow.nomClient, telephone: newRow.telephone, adresse: newRow.adresse, mail: newRow.mail, produit: newRow.produit, date_rdv: newRow.dateRdv || null, statut: "nouveau", notes: newRow.notes, configuration_maison: newRow.configurationMaison });
   }
   async function updateClient(id, updates) {
-    setClients(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+    // Horodatage automatique la 1ère fois qu'un client atteint "documents" ou "installé"
+    // (sert à rattacher les surprimes au mois exact du changement, jamais réécrit ensuite)
+    const current = clients.find(c => c.id === id);
+    const autoStamps = {};
+    if (updates.statut === "documents" && current && !current.documentsDate) autoStamps.documentsDate = new Date().toISOString();
+    if (updates.statut === "installe" && current && !current.installeDate) autoStamps.installeDate = new Date().toISOString();
+    const fullUpdates = { ...updates, ...autoStamps };
+    setClients(prev => prev.map(c => c.id === id ? { ...c, ...fullUpdates } : c));
     const dbUpdates = {};
-    if ("nomClient" in updates) dbUpdates.nom_client = updates.nomClient;
-    if ("telephone" in updates) dbUpdates.telephone = updates.telephone;
-    if ("adresse" in updates) dbUpdates.adresse = updates.adresse;
-    if ("mail" in updates) dbUpdates.mail = updates.mail;
-    if ("produit" in updates) dbUpdates.produit = updates.produit;
-    if ("dateRdv" in updates) dbUpdates.date_rdv = updates.dateRdv || null;
-    if ("statut" in updates) dbUpdates.statut = updates.statut;
-    if ("notes" in updates) dbUpdates.notes = updates.notes;
-    if ("configurationMaison" in updates) dbUpdates.configuration_maison = updates.configurationMaison;
-    if ("raisonAnnulation" in updates) dbUpdates.raison_annulation = updates.raisonAnnulation;
-    if ("rappelDate" in updates) dbUpdates.rappel_date = updates.rappelDate || null;
-    if ("rappelCommentaire" in updates) dbUpdates.rappel_commentaire = updates.rappelCommentaire;
+    if ("nomClient" in fullUpdates) dbUpdates.nom_client = fullUpdates.nomClient;
+    if ("telephone" in fullUpdates) dbUpdates.telephone = fullUpdates.telephone;
+    if ("adresse" in fullUpdates) dbUpdates.adresse = fullUpdates.adresse;
+    if ("mail" in fullUpdates) dbUpdates.mail = fullUpdates.mail;
+    if ("produit" in fullUpdates) dbUpdates.produit = fullUpdates.produit;
+    if ("dateRdv" in fullUpdates) dbUpdates.date_rdv = fullUpdates.dateRdv || null;
+    if ("statut" in fullUpdates) dbUpdates.statut = fullUpdates.statut;
+    if ("notes" in fullUpdates) dbUpdates.notes = fullUpdates.notes;
+    if ("configurationMaison" in fullUpdates) dbUpdates.configuration_maison = fullUpdates.configurationMaison;
+    if ("raisonAnnulation" in fullUpdates) dbUpdates.raison_annulation = fullUpdates.raisonAnnulation;
+    if ("rappelDate" in fullUpdates) dbUpdates.rappel_date = fullUpdates.rappelDate || null;
+    if ("rappelCommentaire" in fullUpdates) dbUpdates.rappel_commentaire = fullUpdates.rappelCommentaire;
+    if ("documentsDate" in fullUpdates) dbUpdates.documents_date = fullUpdates.documentsDate;
+    if ("installeDate" in fullUpdates) dbUpdates.installe_date = fullUpdates.installeDate;
     await supabase.from("crm_clients").update(dbUpdates).eq("id", id);
   }
   async function removeClient(id) {
@@ -515,9 +547,9 @@ export default function App() {
   }
   async function setDonneeRH(agentId, mois, updates) {
     const existing = donneesRH.find(d => d.agentId === agentId && d.mois === mois);
-    const merged = { agentId, mois, pourcentageTempsTravaille: existing ? existing.pourcentageTempsTravaille : 0, primeAssiduite: existing ? existing.primeAssiduite : 0, ...updates };
+    const merged = { agentId, mois, pourcentageTempsTravaille: existing ? existing.pourcentageTempsTravaille : 0, primeAssiduite: existing ? existing.primeAssiduite : 0, primeVersee: existing ? existing.primeVersee : false, ...updates };
     setDonneesRH(prev => existing ? prev.map(d => (d.agentId === agentId && d.mois === mois) ? merged : d) : [...prev, merged]);
-    await supabase.from("crm_donnees_rh_mensuelles").upsert({ agent_id: agentId, mois, pourcentage_temps_travaille: merged.pourcentageTempsTravaille, prime_assiduite: merged.primeAssiduite });
+    await supabase.from("crm_donnees_rh_mensuelles").upsert({ agent_id: agentId, mois, pourcentage_temps_travaille: merged.pourcentageTempsTravaille, prime_assiduite: merged.primeAssiduite, prime_versee: merged.primeVersee });
   }
   async function handleAdminSetup(pw) {
     await supabase.from("app_passwords").insert({ app_name: APP_NAME_ADMIN, password: pw });
@@ -886,14 +918,19 @@ function MesPrimesPage({ agent, allClients, donneesRH }) {
   const [mois, setMois] = useState(todayISO().slice(0, 7));
   const clientsAgent = allClients.filter(c => c.agentId === agent.id);
   const p = calcPrimePerformance(agent, clientsAgent, donneesRH, mois);
+  const report = calcTotalAvecReport(agent, clientsAgent, donneesRH, mois);
   const [y, m] = mois.split("-").map(Number);
   const moisLabel = new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22, flexWrap: "wrap", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
         <PageHeader title="💰 Mes primes" subtitle={`Prime de performance et prime d'assiduité — ${moisLabel}`} />
         <input type="month" value={mois} onChange={e => setMois(e.target.value)} style={{ background: SURFACE, border: `1px solid ${LINE}`, padding: "8px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: TEXT }} />
+      </div>
+
+      <div style={{ background: p.primeVersee ? "rgba(15,169,143,.12)" : "rgba(196,130,30,.12)", border: `1px solid ${p.primeVersee ? "#0FA98F" : "#C4821E"}`, borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: p.primeVersee ? "#0FA98F" : "#C4821E", fontWeight: 600 }}>
+        {p.primeVersee ? `✓ Vous avez reçu l'intégralité de vos primes de ${moisLabel}` : `⏳ Vous n'avez pas encore reçu vos primes de ${moisLabel}`}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 20 }}>
@@ -903,19 +940,19 @@ function MesPrimesPage({ agent, allClients, donneesRH }) {
           <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.primeBasiqueEligible ? "🎉 Éligible ce mois-ci" : "Non éligible ce mois-ci"}</div>
         </div>
         <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 14, padding: 16, borderTop: "3px solid #4FB8D9" }}>
-          <div style={{ fontSize: 9.5, color: TEXT_MUTED, textTransform: "uppercase", fontWeight: 700 }}>Surprimes (cumul total)</div>
-          <div style={{ fontSize: 24, fontWeight: 700, marginTop: 5, color: "#4FB8D9", fontFamily: FONT_DISPLAY }}>{fmtUSD(p.totalSurprimes)}</div>
-          <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.nbDocuments} documents · {p.nbInstalles} installations</div>
+          <div style={{ fontSize: 9.5, color: TEXT_MUTED, textTransform: "uppercase", fontWeight: 700 }}>Surprimes de {moisLabel}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginTop: 5, color: "#4FB8D9", fontFamily: FONT_DISPLAY }}>{fmtUSD(p.totalSurprimesMois)}</div>
+          <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.nbDocuments} documents · {p.nbInstalles} installations ce mois</div>
         </div>
         <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 14, padding: 16, borderTop: "3px solid #7A5FC7" }}>
           <div style={{ fontSize: 9.5, color: TEXT_MUTED, textTransform: "uppercase", fontWeight: 700 }}>Prime d'assiduité (RH)</div>
           <div style={{ fontSize: 24, fontWeight: 700, marginTop: 5, color: "#7A5FC7", fontFamily: FONT_DISPLAY }}>{fmtUSD(p.primeAssiduite)}</div>
-          <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.joursA >= 2 ? `Annulée (${p.joursA} absences ce mois)` : "Calculée par le Suivi RH"}</div>
+          <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>Saisie par la Direction pour ce mois</div>
         </div>
         <div style={{ background: "rgba(45,108,223,.1)", border: `1px solid ${SIGNAL}`, borderRadius: 14, padding: 16 }}>
-          <div style={{ fontSize: 9.5, color: "#9CC0FF", textTransform: "uppercase", fontWeight: 700 }}>Total ce mois</div>
-          <div style={{ fontSize: 26, fontWeight: 700, marginTop: 5, color: "white", fontFamily: FONT_DISPLAY }}>{fmtUSD(p.primeBasique + p.primeAssiduite)}</div>
-          <div style={{ fontSize: 11, color: "#9CC0FF", marginTop: 2 }}>+ {fmtUSD(p.totalSurprimes)} de surprimes cumulées</div>
+          <div style={{ fontSize: 9.5, color: "#9CC0FF", textTransform: "uppercase", fontWeight: 700 }}>Total {report.moisEnRetard.length > 0 ? "dû" : "ce mois"}</div>
+          <div style={{ fontSize: 26, fontWeight: 700, marginTop: 5, color: "white", fontFamily: FONT_DISPLAY }}>{fmtUSD(report.total)}</div>
+          <div style={{ fontSize: 11, color: "#9CC0FF", marginTop: 2 }}>{report.moisEnRetard.length > 0 ? `Inclut l'arriéré de ${report.moisEnRetard.length} mois non versé(s)` : "Basique + surprimes + assiduité"}</div>
         </div>
       </div>
 
@@ -926,7 +963,7 @@ function MesPrimesPage({ agent, allClients, donneesRH }) {
         <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 10 }}>Les 3 conditions doivent être remplies en même temps pour toucher les 25 $ ce mois-ci.</div>
       </Panel>
 
-      <Panel title="Surprimes — détail">
+      <Panel title={`Surprimes de ${moisLabel} — détail`}>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
             <span style={{ color: TEXT }}>📄 Documents reçus ({p.nbDocuments} client{p.nbDocuments > 1 ? "s" : ""} × 5 $)</span>
@@ -937,7 +974,7 @@ function MesPrimesPage({ agent, allClients, donneesRH }) {
             <b style={{ color: "#0FA98F" }}>{fmtUSD(p.surprimeInstallation)}</b>
           </div>
         </div>
-        <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 12 }}>Les surprimes s'accumulent sans limite de temps, sur tous tes clients (pas seulement ceux de ce mois).</div>
+        <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 12 }}>Une surprime compte pour le mois où le statut a été changé — pas le mois du rendez-vous.</div>
       </Panel>
     </>
   );
@@ -988,7 +1025,8 @@ function DashboardPage({ agents, clients, donneesRH }) {
   const parAgent = agents.map(a => {
     const clientsAgent = clients.filter(c => c.agentId === a.id);
     const prime = calcPrimePerformance(a, clientsAgent, donneesRH, moisActuel);
-    return { id: a.id, nom: a.nom, total: clientsAgent.length, installes: clientsAgent.filter(c => c.statut === "installe").length, prime };
+    const report = calcTotalAvecReport(a, clientsAgent, donneesRH, moisActuel);
+    return { id: a.id, nom: a.nom, total: clientsAgent.length, installes: clientsAgent.filter(c => c.statut === "installe").length, prime, report };
   });
 
   return (
@@ -1004,14 +1042,15 @@ function DashboardPage({ agents, clients, donneesRH }) {
       </div>
       <Panel title={`Performance par agent — primes de ${new Date(moisActuel + "-01").toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}`}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-          <thead><tr><Th>Agent</Th><Th>Total clients</Th><Th>Installés</Th><Th>Prime basique</Th><Th>Surprimes (cumul)</Th></tr></thead>
+          <thead><tr><Th>Agent</Th><Th>Total clients</Th><Th>Installés</Th><Th>Prime basique</Th><Th>Surprimes du mois</Th><Th>Total dû ce mois</Th></tr></thead>
           <tbody>{parAgent.map(a => (
             <tr key={a.id} className="askg-tbl-row" style={{ transition: "background .2s ease" }}>
               <Td><b>{a.nom}</b></Td>
               <Td>{a.total}</Td>
               <Td style={{ color: statutInfo("installe").color }}><b>{a.installes}</b></Td>
               <Td style={{ color: a.prime.primeBasiqueEligible ? "#0FA98F" : TEXT_MUTED }}><b>{fmtUSD(a.prime.primeBasique)}</b>{!a.prime.primeBasiqueEligible && <span style={{ fontSize: 10 }}> (non éligible)</span>}</Td>
-              <Td style={{ color: "#4FB8D9" }}><b>{fmtUSD(a.prime.totalSurprimes)}</b></Td>
+              <Td style={{ color: "#4FB8D9" }}><b>{fmtUSD(a.prime.totalSurprimesMois)}</b></Td>
+              <Td style={{ color: "#9CC0FF" }}><b>{fmtUSD(a.report.total)}</b>{a.report.moisEnRetard.length > 0 && <span style={{ fontSize: 10, color: "#C4821E" }}> (+{a.report.moisEnRetard.length} mois en retard)</span>}</Td>
             </tr>
           ))}</tbody>
         </table>
@@ -1125,13 +1164,12 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
 function DonneesRHPage({ agents, donneesRH, setDonneeRH }) {
   const [mois, setMois] = useState(todayISO().slice(0, 7));
   const [edits, setEdits] = useState({});
-  function valeurActuelle(agentId, champ) {
-    const d = donneesRH.find(x => x.agentId === agentId && x.mois === mois);
-    return d ? d[champ] : 0;
+  function donneeActuelle(agentId) {
+    return donneesRH.find(x => x.agentId === agentId && x.mois === mois) || { pourcentageTempsTravaille: 0, primeAssiduite: 0, primeVersee: false };
   }
   function valeurAffichee(agentId, champ) {
     const key = agentId + "_" + champ;
-    return key in edits ? edits[key] : valeurActuelle(agentId, champ);
+    return key in edits ? edits[key] : donneeActuelle(agentId)[champ];
   }
   function onEdit(agentId, champ, val) {
     setEdits(prev => ({ ...prev, [agentId + "_" + champ]: val }));
@@ -1142,6 +1180,9 @@ function DonneesRHPage({ agents, donneesRH, setDonneeRH }) {
     setDonneeRH(agentId, mois, { pourcentageTempsTravaille: pct, primeAssiduite: prime });
     setEdits(prev => { const c = { ...prev }; delete c[agentId + "_pourcentageTempsTravaille"]; delete c[agentId + "_primeAssiduite"]; return c; });
   }
+  function toggleVersee(agentId, val) {
+    setDonneeRH(agentId, mois, { primeVersee: val });
+  }
 
   return (
     <>
@@ -1151,9 +1192,11 @@ function DonneesRHPage({ agents, donneesRH, setDonneeRH }) {
       </div>
       <Panel title="Par agent" accent>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-          <thead><tr><Th>Agent</Th><Th>% temps travaillé (RH)</Th><Th>Prime d'assiduité (RH)</Th><Th></Th></tr></thead>
+          <thead><tr><Th>Agent</Th><Th>% temps travaillé (RH)</Th><Th>Prime d'assiduité (RH)</Th><Th></Th><Th>Statut des primes</Th></tr></thead>
           <tbody>
-            {agents.map(a => (
+            {agents.map(a => {
+              const versee = donneeActuelle(a.id).primeVersee;
+              return (
               <tr key={a.id} className="askg-tbl-row" style={{ transition: "background .2s ease" }}>
                 <Td><b>{a.nom}</b></Td>
                 <Td>
@@ -1169,11 +1212,18 @@ function DonneesRHPage({ agents, donneesRH, setDonneeRH }) {
                   </div>
                 </Td>
                 <Td><button className="askg-btn" onClick={() => enregistrer(a.id)} style={primaryBtnStyle}>Enregistrer</button></Td>
+                <Td>
+                  <button className="askg-btn" onClick={() => toggleVersee(a.id, !versee)} style={{ ...editBtnStyle, background: versee ? "rgba(15,169,143,.14)" : "rgba(196,130,30,.14)", color: versee ? "#0FA98F" : "#C4821E" }}>
+                    {versee ? "✓ Prime versée" : "⏳ Prime non versée"}
+                  </button>
+                </Td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </Panel>
+      <div style={{ fontSize: 11, color: TEXT_MUTED, marginBottom: 14 }}>ℹ️ Tant qu'un mois n'est pas marqué "Prime versée", son montant reste dû et s'ajoute automatiquement au mois suivant côté agent.</div>
       <div style={{ fontSize: 11, color: TEXT_MUTED }}>ℹ️ Ces deux valeurs se lisent dans le Suivi RH → Récapitulatif → colonnes "% temps travaillé" et "Prime assiduité", pour le même mois.</div>
     </>
   );
