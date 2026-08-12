@@ -77,6 +77,54 @@ function parseConfig(str) {
 }
 function countFilled(obj, keys) { return keys.filter(k => obj[k] && String(obj[k]).trim()).length; }
 
+// ============================================================
+// PRIME DE PERFORMANCE — calculée dans le CRM
+// Prime basique (25$, mensuelle, 3 conditions) + surprimes (cumulatives, tout temps)
+// Le % de temps travaillé et la prime d'assiduité sont saisis manuellement par la
+// Direction (lus depuis le Suivi RH), pas de connexion directe entre les 2 logiciels.
+// ============================================================
+const PRIME_BASIQUE_MONTANT = 25;
+const SURPRIME_DOCUMENTS = 5;
+const SURPRIME_INSTALLATION = 50;
+
+function mkOf(d) { return (d || "1970-01-01").slice(0, 7); }
+
+function calcPrimePerformance(agent, tousLesClientsAgent, donneesRH, mk) {
+  const clientsDuMois = tousLesClientsAgent.filter(c => mkOf(c.created_at) === mk);
+  const nbRdv = clientsDuMois.length;
+  const juges = clientsDuMois.filter(c => c.qualite === "valide" || c.qualite === "non_valide");
+  const valides = clientsDuMois.filter(c => c.qualite === "valide");
+  const tauxQualite = juges.length > 0 ? (valides.length / juges.length) * 100 : 0;
+  const donnee = donneesRH.find(d => d.agentId === agent.id && d.mois === mk) || { pourcentageTempsTravaille: 0, primeAssiduite: 0 };
+  const ratioTravail = donnee.pourcentageTempsTravaille || 0;
+  const primeAssiduite = donnee.primeAssiduite || 0;
+
+  const cond1 = nbRdv >= 18;
+  const cond2 = juges.length > 0 && tauxQualite >= 80;
+  const cond3 = ratioTravail >= 90;
+  const primeBasiqueEligible = cond1 && cond2 && cond3;
+  const primeBasique = primeBasiqueEligible ? PRIME_BASIQUE_MONTANT : 0;
+
+  // Surprimes : cumul depuis toujours (tous les clients de l'agent, indépendamment du mois)
+  const idxDocuments = STATUTS_CHAINE.findIndex(s => s.key === "documents");
+  const aAtteintDocuments = c => STATUTS_CHAINE.findIndex(s => s.key === c.statut) >= idxDocuments;
+  const estInstalle = c => c.statut === "installe";
+  const nbDocuments = tousLesClientsAgent.filter(aAtteintDocuments).length;
+  const nbInstalles = tousLesClientsAgent.filter(estInstalle).length;
+  const surprimeDocuments = nbDocuments * SURPRIME_DOCUMENTS;
+  const surprimeInstallation = nbInstalles * SURPRIME_INSTALLATION;
+
+  return {
+    nbRdv, tauxQualite, juges: juges.length, valides: valides.length, ratioTravail,
+    cond1, cond2, cond3, primeBasiqueEligible, primeBasique,
+    nbDocuments, surprimeDocuments, nbInstalles, surprimeInstallation,
+    totalSurprimes: surprimeDocuments + surprimeInstallation,
+    totalPrimePerformance: primeBasique + surprimeDocuments + surprimeInstallation,
+    primeAssiduite,
+  };
+}
+
+
 const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');`;
 const FONT_DISPLAY = "'Poppins', sans-serif";
 const FONT_BODY = "'Inter', 'Segoe UI', sans-serif";
@@ -389,6 +437,7 @@ export default function App() {
   const [agents, setAgents] = useState([]);
   const [clients, setClients] = useState([]);
   const [codes, setCodes] = useState([]);
+  const [donneesRH, setDonneesRH] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
   const [agentConnecte, setAgentConnecte] = useState(null);
@@ -398,17 +447,19 @@ export default function App() {
 
   useEffect(() => {
     async function loadAll() {
-      const [a, c, cd, pw] = await Promise.all([
+      const [a, c, cd, pw, rh] = await Promise.all([
         supabase.from("agents").select("*").order("created_at"),
         supabase.from("crm_clients").select("*").order("created_at", { ascending: false }),
         supabase.from("crm_agent_codes").select("*"),
         supabase.from("app_passwords").select("*").eq("app_name", APP_NAME_ADMIN).maybeSingle(),
+        supabase.from("crm_donnees_rh_mensuelles").select("*"),
       ]);
       if (a.data) setAgents(a.data);
-      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, rappelCommentaire: x.rappel_commentaire, configurationMaison: x.configuration_maison })));
+      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, rappelCommentaire: x.rappel_commentaire, configurationMaison: x.configuration_maison, qualite: x.qualite })));
       if (cd.data) setCodes(cd.data.map(x => ({ ...x, agentId: x.agent_id })));
       if (pw.data) setAdminStoredPw(pw.data.password);
       else setAdminSetupMode(true);
+      if (rh.data) setDonneesRH(rh.data.map(x => ({ agentId: x.agent_id, mois: x.mois, pourcentageTempsTravaille: x.pourcentage_temps_travaille, primeAssiduite: x.prime_assiduite })));
       setLoaded(true);
     }
     loadAll();
@@ -462,6 +513,12 @@ export default function App() {
     await supabase.from("crm_agent_codes").delete().eq("agent_id", id);
     await supabase.from("agents").delete().eq("id", id);
   }
+  async function setDonneeRH(agentId, mois, updates) {
+    const existing = donneesRH.find(d => d.agentId === agentId && d.mois === mois);
+    const merged = { agentId, mois, pourcentageTempsTravaille: existing ? existing.pourcentageTempsTravaille : 0, primeAssiduite: existing ? existing.primeAssiduite : 0, ...updates };
+    setDonneesRH(prev => existing ? prev.map(d => (d.agentId === agentId && d.mois === mois) ? merged : d) : [...prev, merged]);
+    await supabase.from("crm_donnees_rh_mensuelles").upsert({ agent_id: agentId, mois, pourcentage_temps_travaille: merged.pourcentageTempsTravaille, prime_assiduite: merged.primeAssiduite });
+  }
   async function handleAdminSetup(pw) {
     await supabase.from("app_passwords").insert({ app_name: APP_NAME_ADMIN, password: pw });
     setAdminStoredPw(pw);
@@ -502,10 +559,10 @@ export default function App() {
     return <AdminLoginScreen storedPw={adminStoredPw} onLogin={() => setAdminConnecte(true)} onBack={() => setMode(null)} />;
   }
   if (mode === "agent" && agentConnecte) {
-    return <AgentApp agent={agentConnecte} clients={clients.filter(c => c.agentId === agentConnecte.id)} allClients={clients} agents={agents} addClient={addClient} updateClient={updateClient} onLogout={() => setAgentConnecte(null)} />;
+    return <AgentApp agent={agentConnecte} clients={clients.filter(c => c.agentId === agentConnecte.id)} allClients={clients} agents={agents} donneesRH={donneesRH} addClient={addClient} updateClient={updateClient} onLogout={() => setAgentConnecte(null)} />;
   }
   if (mode === "admin" && adminConnecte) {
-    return <AdminApp agents={agents} clients={clients} codes={codes} setAgentCode={setAgentCode} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} updateClient={updateClient} removeClient={removeClient} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
+    return <AdminApp agents={agents} clients={clients} codes={codes} donneesRH={donneesRH} setDonneeRH={setDonneeRH} setAgentCode={setAgentCode} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} updateClient={updateClient} removeClient={removeClient} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
   }
   return null;
 }
@@ -641,7 +698,7 @@ function AdminLoginScreen({ storedPw, onLogin, onBack }) {
 // ============================================================
 // APPLICATION AGENT
 // ============================================================
-function AgentApp({ agent, clients, allClients, agents, addClient, updateClient, onLogout }) {
+function AgentApp({ agent, clients, allClients, agents, donneesRH, addClient, updateClient, onLogout }) {
   const emptyForm = { nomClient: "", telephone: "", adresse: "", mail: "", produit: "", dateRdv: todayISO(), notes: "" };
   const [form, setForm] = useState(emptyForm);
   const [configData, setConfigData] = useState({ ...EMPTY_CONFIG });
@@ -685,6 +742,7 @@ function AgentApp({ agent, clients, allClients, agents, addClient, updateClient,
           <div style={{ display: "flex", background: "rgba(255,255,255,.05)", borderRadius: 99, padding: 4, border: `1px solid ${LINE}` }}>
             <button onClick={() => setVue("perso")} style={{ border: "none", borderRadius: 99, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: vue === "perso" ? SIGNAL : "transparent", color: vue === "perso" ? "white" : TEXT_MUTED, transition: "all .2s ease" }}>Mon espace</button>
             <button onClick={() => setVue("collectif")} style={{ border: "none", borderRadius: 99, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: vue === "collectif" ? SIGNAL : "transparent", color: vue === "collectif" ? "white" : TEXT_MUTED, transition: "all .2s ease" }}>Espace collectif</button>
+            <button onClick={() => setVue("primes")} style={{ border: "none", borderRadius: 99, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: vue === "primes" ? SIGNAL : "transparent", color: vue === "primes" ? "white" : TEXT_MUTED, transition: "all .2s ease" }}>💰 Mes primes</button>
           </div>
           <button onClick={onLogout} style={{ background: "rgba(255,255,255,.06)", color: TEXT, border: `1px solid ${LINE}`, padding: "9px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Déconnexion</button>
         </div>
@@ -693,6 +751,8 @@ function AgentApp({ agent, clients, allClients, agents, addClient, updateClient,
       <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
         {vue === "collectif" ? (
           <EspaceCollectif agents={agents} allClients={allClients} agentActuelId={agent.id} />
+        ) : vue === "primes" ? (
+          <MesPrimesPage agent={agent} allClients={allClients} donneesRH={donneesRH} />
         ) : (
         <>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
@@ -812,11 +872,84 @@ function EspaceCollectif({ agents, allClients, agentActuelId }) {
 }
 
 // ============================================================
+// MES PRIMES — prime de performance (calculée ici) + prime d'assiduité (miroir du RH)
+// ============================================================
+function ConditionRow({ ok, label }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, padding: "6px 0" }}>
+      <span style={{ width: 18, height: 18, borderRadius: 99, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0, background: ok ? "rgba(15,169,143,.18)" : "rgba(196,61,70,.18)", color: ok ? "#0FA98F" : "#E0656B" }}>{ok ? "✓" : "✗"}</span>
+      <span style={{ color: TEXT }}>{label}</span>
+    </div>
+  );
+}
+function MesPrimesPage({ agent, allClients, donneesRH }) {
+  const [mois, setMois] = useState(todayISO().slice(0, 7));
+  const clientsAgent = allClients.filter(c => c.agentId === agent.id);
+  const p = calcPrimePerformance(agent, clientsAgent, donneesRH, mois);
+  const [y, m] = mois.split("-").map(Number);
+  const moisLabel = new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22, flexWrap: "wrap", gap: 12 }}>
+        <PageHeader title="💰 Mes primes" subtitle={`Prime de performance et prime d'assiduité — ${moisLabel}`} />
+        <input type="month" value={mois} onChange={e => setMois(e.target.value)} style={{ background: SURFACE, border: `1px solid ${LINE}`, padding: "8px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: TEXT }} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, marginBottom: 20 }}>
+        <div style={{ background: SURFACE, border: `1px solid ${p.primeBasiqueEligible ? "#0FA98F" : LINE}`, borderRadius: 14, padding: 16, borderTop: `3px solid ${p.primeBasiqueEligible ? "#0FA98F" : "#3A3E4C"}` }}>
+          <div style={{ fontSize: 9.5, color: TEXT_MUTED, textTransform: "uppercase", fontWeight: 700 }}>Prime basique</div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginTop: 5, color: p.primeBasiqueEligible ? "#0FA98F" : TEXT_MUTED, fontFamily: FONT_DISPLAY }}>{fmtUSD(p.primeBasique)}</div>
+          <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.primeBasiqueEligible ? "🎉 Éligible ce mois-ci" : "Non éligible ce mois-ci"}</div>
+        </div>
+        <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 14, padding: 16, borderTop: "3px solid #4FB8D9" }}>
+          <div style={{ fontSize: 9.5, color: TEXT_MUTED, textTransform: "uppercase", fontWeight: 700 }}>Surprimes (cumul total)</div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginTop: 5, color: "#4FB8D9", fontFamily: FONT_DISPLAY }}>{fmtUSD(p.totalSurprimes)}</div>
+          <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.nbDocuments} documents · {p.nbInstalles} installations</div>
+        </div>
+        <div style={{ background: SURFACE, border: `1px solid ${LINE}`, borderRadius: 14, padding: 16, borderTop: "3px solid #7A5FC7" }}>
+          <div style={{ fontSize: 9.5, color: TEXT_MUTED, textTransform: "uppercase", fontWeight: 700 }}>Prime d'assiduité (RH)</div>
+          <div style={{ fontSize: 24, fontWeight: 700, marginTop: 5, color: "#7A5FC7", fontFamily: FONT_DISPLAY }}>{fmtUSD(p.primeAssiduite)}</div>
+          <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 2 }}>{p.joursA >= 2 ? `Annulée (${p.joursA} absences ce mois)` : "Calculée par le Suivi RH"}</div>
+        </div>
+        <div style={{ background: "rgba(45,108,223,.1)", border: `1px solid ${SIGNAL}`, borderRadius: 14, padding: 16 }}>
+          <div style={{ fontSize: 9.5, color: "#9CC0FF", textTransform: "uppercase", fontWeight: 700 }}>Total ce mois</div>
+          <div style={{ fontSize: 26, fontWeight: 700, marginTop: 5, color: "white", fontFamily: FONT_DISPLAY }}>{fmtUSD(p.primeBasique + p.primeAssiduite)}</div>
+          <div style={{ fontSize: 11, color: "#9CC0FF", marginTop: 2 }}>+ {fmtUSD(p.totalSurprimes)} de surprimes cumulées</div>
+        </div>
+      </div>
+
+      <Panel title="Conditions de la prime basique (25 $)" accent>
+        <ConditionRow ok={p.cond1} label={`Au moins 18 rendez-vous ce mois — actuellement ${p.nbRdv}`} />
+        <ConditionRow ok={p.cond2} label={`Au moins 80% de qualité validée — actuellement ${p.juges > 0 ? Math.round(p.tauxQualite) + "%" : "aucun rendez-vous jugé"} (${p.valides}/${p.juges} validés)`} />
+        <ConditionRow ok={p.cond3} label={`Au moins 90% du temps de travail attendu — actuellement ${Math.round(p.ratioTravail)}%`} />
+        <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 10 }}>Les 3 conditions doivent être remplies en même temps pour toucher les 25 $ ce mois-ci.</div>
+      </Panel>
+
+      <Panel title="Surprimes — détail">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+            <span style={{ color: TEXT }}>📄 Documents reçus ({p.nbDocuments} client{p.nbDocuments > 1 ? "s" : ""} × 5 $)</span>
+            <b style={{ color: "#4FB8D9" }}>{fmtUSD(p.surprimeDocuments)}</b>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+            <span style={{ color: TEXT }}>🏠 Installations ({p.nbInstalles} client{p.nbInstalles > 1 ? "s" : ""} × 50 $)</span>
+            <b style={{ color: "#0FA98F" }}>{fmtUSD(p.surprimeInstallation)}</b>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 12 }}>Les surprimes s'accumulent sans limite de temps, sur tous tes clients (pas seulement ceux de ce mois).</div>
+      </Panel>
+    </>
+  );
+}
+function fmtUSD(n) { return (n || 0).toLocaleString("fr-FR", { minimumFractionDigits: 0 }) + " $"; }
+
+// ============================================================
 // APPLICATION ADMIN
 // ============================================================
-function AdminApp({ agents, clients, codes, setAgentCode, addAgentEntry, removeAgentEntry, updateClient, removeClient, onChangePassword, onLogout }) {
+function AdminApp({ agents, clients, codes, donneesRH, setDonneeRH, setAgentCode, addAgentEntry, removeAgentEntry, updateClient, removeClient, onChangePassword, onLogout }) {
   const [page, setPage] = useState("dashboard");
-  const navItems = [["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["agents", "Gestion des agents"], ["codes", "Codes agents"], ["parametres", "Paramètres"]];
+  const navItems = [["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["agents", "Gestion des agents"], ["donneesrh", "Données RH"], ["codes", "Codes agents"], ["parametres", "Paramètres"]];
   return (
     <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT_BODY }}>
       <style>{GLOBAL_CSS}</style>
@@ -836,9 +969,10 @@ function AdminApp({ agents, clients, codes, setAgentCode, addAgentEntry, removeA
         </div>
       </div>
       <div style={{ padding: "24px 28px", maxWidth: 1300, margin: "0 auto", overflowX: "auto" }}>
-        {page === "dashboard" && <DashboardPage agents={agents} clients={clients} />}
+        {page === "dashboard" && <DashboardPage agents={agents} clients={clients} donneesRH={donneesRH} />}
         {page === "clients" && <TousLesClientsPage agents={agents} clients={clients} updateClient={updateClient} removeClient={removeClient} />}
         {page === "agents" && <GestionAgentsPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} />}
+        {page === "donneesrh" && <DonneesRHPage agents={agents} donneesRH={donneesRH} setDonneeRH={setDonneeRH} />}
         {page === "codes" && <CodesAgentsPage agents={agents} codes={codes} setAgentCode={setAgentCode} />}
         {page === "parametres" && <ParametresPage onChangePassword={onChangePassword} />}
       </div>
@@ -846,11 +980,16 @@ function AdminApp({ agents, clients, codes, setAgentCode, addAgentEntry, removeA
   );
 }
 
-function DashboardPage({ agents, clients }) {
+function DashboardPage({ agents, clients, donneesRH }) {
   const counts = {};
   STATUTS.forEach(s => { counts[s.key] = clients.filter(c => c.statut === s.key).length; });
   function nomAgent(id) { const a = agents.find(x => x.id === id); return a ? a.nom : "?"; }
-  const parAgent = agents.map(a => ({ nom: a.nom, total: clients.filter(c => c.agentId === a.id).length, installes: clients.filter(c => c.agentId === a.id && c.statut === "installe").length }));
+  const moisActuel = todayISO().slice(0, 7);
+  const parAgent = agents.map(a => {
+    const clientsAgent = clients.filter(c => c.agentId === a.id);
+    const prime = calcPrimePerformance(a, clientsAgent, donneesRH, moisActuel);
+    return { id: a.id, nom: a.nom, total: clientsAgent.length, installes: clientsAgent.filter(c => c.statut === "installe").length, prime };
+  });
 
   return (
     <>
@@ -863,10 +1002,18 @@ function DashboardPage({ agents, clients }) {
           </div>
         ))}
       </div>
-      <Panel title="Performance par agent">
+      <Panel title={`Performance par agent — primes de ${new Date(moisActuel + "-01").toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}`}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-          <thead><tr><Th>Agent</Th><Th>Total clients</Th><Th>Installés</Th></tr></thead>
-          <tbody>{parAgent.map(a => (<tr key={a.nom} className="askg-tbl-row" style={{ transition: "background .2s ease" }}><Td><b>{a.nom}</b></Td><Td>{a.total}</Td><Td style={{ color: statutInfo("installe").color }}><b>{a.installes}</b></Td></tr>))}</tbody>
+          <thead><tr><Th>Agent</Th><Th>Total clients</Th><Th>Installés</Th><Th>Prime basique</Th><Th>Surprimes (cumul)</Th></tr></thead>
+          <tbody>{parAgent.map(a => (
+            <tr key={a.id} className="askg-tbl-row" style={{ transition: "background .2s ease" }}>
+              <Td><b>{a.nom}</b></Td>
+              <Td>{a.total}</Td>
+              <Td style={{ color: statutInfo("installe").color }}><b>{a.installes}</b></Td>
+              <Td style={{ color: a.prime.primeBasiqueEligible ? "#0FA98F" : TEXT_MUTED }}><b>{fmtUSD(a.prime.primeBasique)}</b>{!a.prime.primeBasiqueEligible && <span style={{ fontSize: 10 }}> (non éligible)</span>}</Td>
+              <Td style={{ color: "#4FB8D9" }}><b>{fmtUSD(a.prime.totalSurprimes)}</b></Td>
+            </tr>
+          ))}</tbody>
         </table>
       </Panel>
       <Panel title="Derniers clients ajoutés">
@@ -917,7 +1064,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
         {filtres.length === 0 ? <EmptyState text="Aucun client ne correspond à ces filtres." /> : (
           <div style={{ overflowX: "auto" }}>
             <table className="askg-tbl" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-              <thead><tr><Th>Agent</Th><Th>Client</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Coordonnées</Th><Th>Config. maison</Th><Th>Date RDV</Th><Th>Statut</Th><Th>Détails (rappel / raison)</Th><Th>Notes</Th><Th></Th></tr></thead>
+              <thead><tr><Th>Agent</Th><Th>Client</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Coordonnées</Th><Th>Config. maison</Th><Th>Date RDV</Th><Th>Statut</Th><Th>Qualité</Th><Th>Détails (rappel / raison)</Th><Th>Notes</Th><Th></Th></tr></thead>
               <tbody>
                 {filtres.map((c, i) => (
                   <tr key={c.id} className="askg-tbl-row" style={{ transition: "background .2s ease", animation: "askgRowIn .4s ease forwards", animationDelay: Math.min(i * .04, .3) + "s", opacity: 0 }}>
@@ -931,6 +1078,13 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
                     <Td>
                       <select value={c.statut} onChange={e => updateClient(c.id, { statut: e.target.value })} style={{ ...inputStyle, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color, fontWeight: 700 }}>
                         {STATUTS.map(s => <option key={s.key} value={s.key} style={{ background: SURFACE, color: TEXT }}>{s.label}</option>)}
+                      </select>
+                    </Td>
+                    <Td>
+                      <select value={c.qualite || ""} onChange={e => updateClient(c.id, { qualite: e.target.value })} style={{ ...inputStyle, width: 130, fontWeight: 700, background: c.qualite === "valide" ? "rgba(15,169,143,.14)" : c.qualite === "non_valide" ? "rgba(196,61,70,.14)" : "rgba(255,255,255,.06)", color: c.qualite === "valide" ? "#0FA98F" : c.qualite === "non_valide" ? "#E0656B" : TEXT_MUTED }}>
+                        <option value="" style={{ background: SURFACE, color: TEXT }}>Non jugé</option>
+                        <option value="valide" style={{ background: SURFACE, color: TEXT }}>✓ Qualité OK</option>
+                        <option value="non_valide" style={{ background: SURFACE, color: TEXT }}>✗ Non qualité</option>
                       </select>
                     </Td>
                     <Td>
@@ -964,6 +1118,67 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
 // GESTION DES AGENTS — ajout / suppression, directement depuis le CRM
 // (même liste d'agents que le logiciel RH — partagée)
 // ============================================================
+// ============================================================
+// DONNÉES RH DU MOIS — saisie manuelle (indépendante du logiciel RH)
+// % temps travaillé (lu sur le Récapitulatif du RH) + montant de la prime d'assiduité
+// ============================================================
+function DonneesRHPage({ agents, donneesRH, setDonneeRH }) {
+  const [mois, setMois] = useState(todayISO().slice(0, 7));
+  const [edits, setEdits] = useState({});
+  function valeurActuelle(agentId, champ) {
+    const d = donneesRH.find(x => x.agentId === agentId && x.mois === mois);
+    return d ? d[champ] : 0;
+  }
+  function valeurAffichee(agentId, champ) {
+    const key = agentId + "_" + champ;
+    return key in edits ? edits[key] : valeurActuelle(agentId, champ);
+  }
+  function onEdit(agentId, champ, val) {
+    setEdits(prev => ({ ...prev, [agentId + "_" + champ]: val }));
+  }
+  function enregistrer(agentId) {
+    const pct = parseFloat(valeurAffichee(agentId, "pourcentageTempsTravaille")) || 0;
+    const prime = parseFloat(valeurAffichee(agentId, "primeAssiduite")) || 0;
+    setDonneeRH(agentId, mois, { pourcentageTempsTravaille: pct, primeAssiduite: prime });
+    setEdits(prev => { const c = { ...prev }; delete c[agentId + "_pourcentageTempsTravaille"]; delete c[agentId + "_primeAssiduite"]; return c; });
+  }
+
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22, flexWrap: "wrap", gap: 12 }}>
+        <PageHeader title="Données RH du mois" subtitle="Saisie manuelle — lis les valeurs sur le Récapitulatif du Suivi RH et reporte-les ici" />
+        <input type="month" value={mois} onChange={e => setMois(e.target.value)} style={{ background: SURFACE, border: `1px solid ${LINE}`, padding: "8px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, color: TEXT }} />
+      </div>
+      <Panel title="Par agent" accent>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+          <thead><tr><Th>Agent</Th><Th>% temps travaillé (RH)</Th><Th>Prime d'assiduité (RH)</Th><Th></Th></tr></thead>
+          <tbody>
+            {agents.map(a => (
+              <tr key={a.id} className="askg-tbl-row" style={{ transition: "background .2s ease" }}>
+                <Td><b>{a.nom}</b></Td>
+                <Td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="number" step="0.1" value={valeurAffichee(a.id, "pourcentageTempsTravaille")} onChange={e => onEdit(a.id, "pourcentageTempsTravaille", e.target.value)} style={{ ...inputStyle, width: 80 }} />
+                    <span style={{ color: TEXT_MUTED, fontSize: 11 }}>%</span>
+                  </div>
+                </Td>
+                <Td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <input type="number" step="0.5" value={valeurAffichee(a.id, "primeAssiduite")} onChange={e => onEdit(a.id, "primeAssiduite", e.target.value)} style={{ ...inputStyle, width: 80 }} />
+                    <span style={{ color: TEXT_MUTED, fontSize: 11 }}>$</span>
+                  </div>
+                </Td>
+                <Td><button className="askg-btn" onClick={() => enregistrer(a.id)} style={primaryBtnStyle}>Enregistrer</button></Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Panel>
+      <div style={{ fontSize: 11, color: TEXT_MUTED }}>ℹ️ Ces deux valeurs se lisent dans le Suivi RH → Récapitulatif → colonnes "% temps travaillé" et "Prime assiduité", pour le même mois.</div>
+    </>
+  );
+}
+
 function GestionAgentsPage({ agents, clients, addAgentEntry, removeAgentEntry }) {
   const [nom, setNom] = useState("");
   const [poste, setPoste] = useState("Agent de téléprospection");
