@@ -618,6 +618,7 @@ export default function App() {
     if ("raisonAnnulation" in fullUpdates) dbUpdates.raison_annulation = fullUpdates.raisonAnnulation;
     if ("rappelDate" in fullUpdates) dbUpdates.rappel_date = fullUpdates.rappelDate || null;
     if ("rappelCommentaire" in fullUpdates) dbUpdates.rappel_commentaire = fullUpdates.rappelCommentaire;
+    if ("qualite" in fullUpdates) dbUpdates.qualite = fullUpdates.qualite;
     if ("documentsDate" in fullUpdates) dbUpdates.documents_date = fullUpdates.documentsDate;
     if ("installeDate" in fullUpdates) dbUpdates.installe_date = fullUpdates.installeDate;
     await supabase.from("crm_clients").update(dbUpdates).eq("id", id);
