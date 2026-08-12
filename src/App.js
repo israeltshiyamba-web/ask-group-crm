@@ -186,14 +186,20 @@ ${FONT_IMPORT}
 .askg-kpi:hover { box-shadow: 0 10px 26px rgba(0,0,0,.3); }
 .askg-nav-item:hover { color:${TEXT} !important; }
 @media (max-width: 768px) {
-  .askg-shell { flex-direction: column !important; }
-  .askg-sidebar { width: 100% !important; padding: 12px 0 !important; }
-  .askg-sidebar-header { padding: 0 16px 12px !important; margin-bottom: 8px !important; }
-  .askg-sidebar-nav { display: flex !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; padding: 0 8px !important; }
-  .askg-sidebar-nav > div { white-space: nowrap !important; padding: 8px 14px !important; border-left: none !important; border-bottom: 3px solid transparent !important; }
-  .askg-main { padding: 14px !important; }
+  .askg-agent-header, .askg-admin-header { padding: 12px 14px !important; }
+  .askg-header-actions { width: 100%; flex-direction: column !important; align-items: stretch !important; }
+  .askg-toggle-wrap { width: 100% !important; }
+  .askg-nav-btns { width: 100%; }
+  .askg-nav-btns button { flex: 1; padding: 8px 6px !important; font-size: 10.5px !important; }
   table { font-size: 11px !important; }
-  h1 { font-size: 18px !important; }
+  h1 { font-size: 19px !important; }
+  .hero-wrap-mobile { flex-direction: column !important; gap: 24px !important; }
+}
+@media (max-width: 480px) {
+  .askg-agent-header, .askg-admin-header { padding: 10px 12px !important; }
+  .askg-toggle-wrap button { font-size: 10px !important; padding: 7px 4px !important; }
+  h1 { font-size: 17px !important; }
+  .askg-kpi, .askg-client-card { padding: 12px !important; }
 }
 `;
 
@@ -698,7 +704,7 @@ function ChoixModeScreen({ onChoose }) {
       <BgGlow />
       <Waveform pos="top" />
       <Waveform pos="bottom" />
-      <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", gap: 56, flexWrap: "wrap", padding: 20 }}>
+      <div className="hero-wrap-mobile" style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", gap: 56, flexWrap: "wrap", padding: 20 }}>
         <AgentIllustration size={230} />
         <div style={{ background: "rgba(29,32,41,.92)", backdropFilter: "blur(20px)", border: `1px solid ${LINE}`, borderRadius: 20, padding: 40, width: 370, textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.5)", animation: "askgCardIn .7s cubic-bezier(.16,1,.3,1)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
@@ -849,22 +855,22 @@ function AgentApp({ agent, clients, allClients, agents, donneesRH, addClient, up
   return (
     <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT_BODY }}>
       <style>{GLOBAL_CSS}</style>
-      <div style={{ background: SURFACE, color: TEXT, padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, borderBottom: `1px solid ${LINE}` }}>
+      <div className="askg-agent-header" style={{ background: SURFACE, color: TEXT, padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, borderBottom: `1px solid ${LINE}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: SIGNAL, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 15 }}>{agent.nom.charAt(0)}</div>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: SIGNAL, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 15, flexShrink: 0 }}>{agent.nom.charAt(0)}</div>
           <div>
             <div style={{ fontSize: 10, letterSpacing: 2, color: TEXT_MUTED, fontWeight: 600, fontFamily: FONT_MONO }}>ASK GROUP — CRM</div>
             <div style={{ fontSize: 17, fontWeight: 600, fontFamily: FONT_DISPLAY }}>{agent.nom}</div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <div style={{ position: "relative", display: "flex", background: "rgba(255,255,255,.05)", borderRadius: 99, padding: 4, border: `1px solid ${LINE}`, width: 330 }}>
+        <div className="askg-header-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="askg-toggle-wrap" style={{ position: "relative", display: "flex", background: "rgba(255,255,255,.05)", borderRadius: 99, padding: 4, border: `1px solid ${LINE}`, width: 330 }}>
             <div style={{ position: "absolute", top: 4, bottom: 4, left: `calc(${["perso", "collectif", "primes"].indexOf(vue)} * ((100% - 8px) / 3) + 4px)`, width: "calc((100% - 8px) / 3)", background: SIGNAL, borderRadius: 99, transition: "left .35s cubic-bezier(.16,1,.3,1)", boxShadow: "0 4px 14px rgba(45,108,223,.45)" }} />
             {[["perso", "Mon espace"], ["collectif", "Espace collectif"], ["primes", "💰 Mes primes"]].map(([k, l]) => (
               <button key={k} onClick={(e) => { ripple(e); setVue(k); }} style={{ position: "relative", zIndex: 1, flex: 1, border: "none", background: "transparent", borderRadius: 99, padding: "7px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", color: vue === k ? "white" : TEXT_MUTED, transition: "color .25s ease", overflow: "hidden" }}>{l}</button>
             ))}
           </div>
-          <button onClick={onLogout} style={{ background: "rgba(255,255,255,.06)", color: TEXT, border: `1px solid ${LINE}`, padding: "9px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Déconnexion</button>
+          <button onClick={onLogout} style={{ background: "rgba(255,255,255,.06)", color: TEXT, border: `1px solid ${LINE}`, padding: "9px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>Déconnexion</button>
         </div>
       </div>
 
@@ -1101,7 +1107,7 @@ function AdminApp({ agents, clients, codes, donneesRH, setDonneeRH, setAgentCode
   return (
     <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT_BODY }}>
       <style>{GLOBAL_CSS}</style>
-      <div style={{ background: SURFACE, color: TEXT, padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, borderBottom: `1px solid ${LINE}` }}>
+      <div className="askg-admin-header" style={{ background: SURFACE, color: TEXT, padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, borderBottom: `1px solid ${LINE}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ width: 7, height: 7, borderRadius: 99, background: SIGNAL, boxShadow: `0 0 10px ${SIGNAL}`, animation: "askgPulse 1.6s ease-in-out infinite" }} />
           <div>
@@ -1109,7 +1115,7 @@ function AdminApp({ agents, clients, codes, donneesRH, setDonneeRH, setAgentCode
             <div style={{ fontSize: 16, fontWeight: 600, fontFamily: FONT_DISPLAY }}>CRM — Direction</div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <div className="askg-nav-btns" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           {navItems.map(([k, l]) => (
             <button key={k} className="askg-btn" onClick={(e) => { ripple(e); setPage(k); }} style={{ border: "none", borderRadius: 99, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: page === k ? SIGNAL : "rgba(255,255,255,.05)", color: page === k ? "white" : TEXT_MUTED, transition: "background .2s ease, color .2s ease", position: "relative", overflow: "hidden" }}>{l}</button>
           ))}
