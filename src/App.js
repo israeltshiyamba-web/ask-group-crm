@@ -481,6 +481,52 @@ function AdminConfigMaisonModal({ client, onSave, onClose }) {
   );
 }
 
+function formatTaille(bytes) {
+  if (!bytes) return "";
+  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + " Ko";
+  return (bytes / (1024 * 1024)).toFixed(1) + " Mo";
+}
+
+// Documents clients — visible et gérable uniquement depuis l'accès Direction
+function DocumentsModal({ client, documents, onUpload, onDelete, onClose }) {
+  const [uploading, setUploading] = useState(false);
+  const docsClient = documents.filter(d => d.clientId === client.id);
+
+  async function handleFiles(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setUploading(true);
+    for (const f of files) await onUpload(client.id, f);
+    setUploading(false);
+    e.target.value = "";
+  }
+
+  return (
+    <Modal title={`📎 Documents — ${client.nomClient}`} onClose={onClose}>
+      <label style={{ ...primaryBtnStyle, display: "inline-flex", alignItems: "center", cursor: uploading ? "default" : "pointer", opacity: uploading ? .6 : 1, marginBottom: 16 }}>
+        {uploading ? "Envoi en cours…" : "+ Ajouter un document"}
+        <input type="file" accept="image/*,application/pdf" multiple onChange={handleFiles} disabled={uploading} style={{ display: "none" }} />
+      </label>
+      {docsClient.length === 0 ? <EmptyState text="Aucun document envoyé pour ce client." /> : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {docsClient.map(d => {
+            const url = supabase.storage.from("crm-documents").getPublicUrl(d.cheminStockage).data.publicUrl;
+            return (
+              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#12141A", border: `1px solid ${LINE}`, borderRadius: 10, padding: "10px 14px" }}>
+                <a href={url} target="_blank" rel="noreferrer" style={{ color: "#9CC0FF", fontSize: 12.5, textDecoration: "none", wordBreak: "break-all", flex: 1 }}>
+                  {d.typeFichier && d.typeFichier.startsWith("image/") ? "🖼️" : "📄"} {d.nomFichier}
+                  <div style={{ fontSize: 10, color: TEXT_MUTED, marginTop: 2 }}>{formatTaille(d.taille)} · {new Date(d.created_at).toLocaleDateString("fr-FR")}</div>
+                </a>
+                <button className="askg-btn" onClick={(e) => { ripple(e); onDelete(d); }} style={delBtnStyle}>Suppr.</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function SignalChain({ current }) {
   const isBranch = current === "annule" || current === "rappeler";
   const idx = isBranch ? STATUTS_CHAINE.length - 1 : STATUTS_CHAINE.findIndex(s => s.key === current);
@@ -513,6 +559,7 @@ export default function App() {
   const [clients, setClients] = useState([]);
   const [codes, setCodes] = useState([]);
   const [donneesRH, setDonneesRH] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
   const [agentConnecte, setAgentConnecte] = useState(null);
@@ -522,12 +569,13 @@ export default function App() {
 
   useEffect(() => {
     async function loadAll() {
-      const [a, c, cd, pw, rh] = await Promise.all([
+      const [a, c, cd, pw, rh, docs] = await Promise.all([
         supabase.from("agents").select("*").order("created_at"),
         supabase.from("crm_clients").select("*").order("created_at", { ascending: false }),
         supabase.from("crm_agent_codes").select("*"),
         supabase.from("app_passwords").select("*").eq("app_name", APP_NAME_ADMIN).maybeSingle(),
         supabase.from("crm_donnees_rh_mensuelles").select("*"),
+        supabase.from("crm_documents").select("*").order("created_at", { ascending: false }),
       ]);
       if (a.data) setAgents(a.data);
       if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, rappelCommentaire: x.rappel_commentaire, configurationMaison: x.configuration_maison, qualite: x.qualite, documentsDate: x.documents_date, installeDate: x.installe_date })));
@@ -535,6 +583,7 @@ export default function App() {
       if (pw.data) setAdminStoredPw(pw.data.password);
       else setAdminSetupMode(true);
       if (rh.data) setDonneesRH(rh.data.map(x => ({ agentId: x.agent_id, mois: x.mois, pourcentageTempsTravaille: x.pourcentage_temps_travaille, primeAssiduite: x.prime_assiduite, primeVersee: x.prime_versee })));
+      if (docs.data) setDocuments(docs.data.map(x => ({ id: x.id, clientId: x.client_id, nomFichier: x.nom_fichier, cheminStockage: x.chemin_stockage, typeFichier: x.type_fichier, taille: x.taille, created_at: x.created_at })));
       setLoaded(true);
     }
     loadAll();
@@ -603,6 +652,20 @@ export default function App() {
     setDonneesRH(prev => existing ? prev.map(d => (d.agentId === agentId && d.mois === mois) ? merged : d) : [...prev, merged]);
     await supabase.from("crm_donnees_rh_mensuelles").upsert({ agent_id: agentId, mois, pourcentage_temps_travaille: merged.pourcentageTempsTravaille, prime_assiduite: merged.primeAssiduite, prime_versee: merged.primeVersee });
   }
+  async function uploadDocument(clientId, file) {
+    if (file.size > 15 * 1024 * 1024) { window.alert("Fichier trop volumineux (15 Mo max)."); return; }
+    const path = `${clientId}/${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from("crm-documents").upload(path, file);
+    if (error) { window.alert("Erreur lors de l'envoi : " + error.message); return; }
+    const newDoc = { id: uid(), clientId, nomFichier: file.name, cheminStockage: path, typeFichier: file.type, taille: file.size, created_at: new Date().toISOString() };
+    setDocuments(prev => [newDoc, ...prev]);
+    await supabase.from("crm_documents").insert({ id: newDoc.id, client_id: clientId, nom_fichier: newDoc.nomFichier, chemin_stockage: newDoc.cheminStockage, type_fichier: newDoc.typeFichier, taille: newDoc.taille });
+  }
+  async function removeDocument(doc) {
+    await supabase.storage.from("crm-documents").remove([doc.cheminStockage]);
+    await supabase.from("crm_documents").delete().eq("id", doc.id);
+    setDocuments(prev => prev.filter(d => d.id !== doc.id));
+  }
   async function handleAdminSetup(pw) {
     await supabase.from("app_passwords").insert({ app_name: APP_NAME_ADMIN, password: pw });
     setAdminStoredPw(pw);
@@ -647,7 +710,7 @@ export default function App() {
     return <AgentApp agent={agentConnecte} clients={clients.filter(c => c.agentId === agentConnecte.id)} allClients={clients} agents={agents} donneesRH={donneesRH} addClient={addClient} updateClient={updateClient} onLogout={() => setAgentConnecte(null)} />;
   }
   if (mode === "admin" && adminConnecte) {
-    return <AdminApp agents={agents} clients={clients} codes={codes} donneesRH={donneesRH} setDonneeRH={setDonneeRH} setAgentCode={setAgentCode} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} updateClient={updateClient} removeClient={removeClient} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
+    return <AdminApp agents={agents} clients={clients} codes={codes} donneesRH={donneesRH} setDonneeRH={setDonneeRH} documents={documents} uploadDocument={uploadDocument} removeDocument={removeDocument} setAgentCode={setAgentCode} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} updateClient={updateClient} removeClient={removeClient} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
   }
   return null;
 }
@@ -1101,7 +1164,7 @@ function fmtUSD(n) { return (n || 0).toLocaleString("fr-FR", { minimumFractionDi
 // ============================================================
 // APPLICATION ADMIN
 // ============================================================
-function AdminApp({ agents, clients, codes, donneesRH, setDonneeRH, setAgentCode, addAgentEntry, removeAgentEntry, updateClient, removeClient, onChangePassword, onLogout }) {
+function AdminApp({ agents, clients, codes, donneesRH, setDonneeRH, documents, uploadDocument, removeDocument, setAgentCode, addAgentEntry, removeAgentEntry, updateClient, removeClient, onChangePassword, onLogout }) {
   const [page, setPage] = useState("dashboard");
   const navItems = [["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["agents", "Gestion des agents"], ["donneesrh", "Données RH"], ["codes", "Codes agents"], ["parametres", "Paramètres"]];
   return (
@@ -1125,7 +1188,7 @@ function AdminApp({ agents, clients, codes, donneesRH, setDonneeRH, setAgentCode
       <div style={{ padding: "24px 28px", maxWidth: 1300, margin: "0 auto", overflowX: "auto" }}>
         <div key={page} style={{ animation: "askgPageIn 3.5s cubic-bezier(.16,1,.3,1)" }}>
           {page === "dashboard" && <DashboardPage agents={agents} clients={clients} donneesRH={donneesRH} />}
-          {page === "clients" && <TousLesClientsPage agents={agents} clients={clients} updateClient={updateClient} removeClient={removeClient} />}
+          {page === "clients" && <TousLesClientsPage agents={agents} clients={clients} updateClient={updateClient} removeClient={removeClient} documents={documents} uploadDocument={uploadDocument} removeDocument={removeDocument} />}
           {page === "agents" && <GestionAgentsPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} />}
           {page === "donneesrh" && <DonneesRHPage agents={agents} donneesRH={donneesRH} setDonneeRH={setDonneeRH} />}
           {page === "codes" && <CodesAgentsPage agents={agents} codes={codes} setAgentCode={setAgentCode} />}
@@ -1189,15 +1252,17 @@ function DashboardPage({ agents, clients, donneesRH }) {
   );
 }
 
-function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
+function TousLesClientsPage({ agents, clients, updateClient, removeClient, documents, uploadDocument, removeDocument }) {
   const [filtreAgent, setFiltreAgent] = useState("tous");
   const [filtreStatut, setFiltreStatut] = useState("tous");
   const [viewCoordId, setViewCoordId] = useState(null);
   const [viewConfigId, setViewConfigId] = useState(null);
+  const [viewDocsId, setViewDocsId] = useState(null);
   function nomAgent(id) { const a = agents.find(x => x.id === id); return a ? a.nom : "?"; }
   const filtres = clients.filter(c => (filtreAgent === "tous" || c.agentId === filtreAgent) && (filtreStatut === "tous" || c.statut === filtreStatut));
   const clientCoord = clients.find(x => x.id === viewCoordId);
   const clientConfig = clients.find(x => x.id === viewConfigId);
+  const clientDocs = clients.find(x => x.id === viewDocsId);
 
   return (
     <>
@@ -1222,7 +1287,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
         {filtres.length === 0 ? <EmptyState text="Aucun client ne correspond à ces filtres." /> : (
           <div style={{ overflowX: "auto" }}>
             <table className="askg-tbl" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-              <thead><tr><Th>Agent</Th><Th>Client</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Coordonnées</Th><Th>Config. maison</Th><Th>Date RDV</Th><Th>Statut</Th><Th>Qualité</Th><Th>Détails (rappel / raison)</Th><Th>Notes</Th><Th></Th></tr></thead>
+              <thead><tr><Th>Agent</Th><Th>Client</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Coordonnées</Th><Th>Config. maison</Th><Th>Documents</Th><Th>Date RDV</Th><Th>Statut</Th><Th>Qualité</Th><Th>Détails (rappel / raison)</Th><Th>Notes</Th><Th></Th></tr></thead>
               <tbody>
                 {filtres.map((c, i) => (
                   <tr key={c.id} className="askg-tbl-row" style={{ transition: "background .2s ease", animation: "askgRowIn .4s ease forwards", animationDelay: Math.min(i * .04, .3) + "s", opacity: 0 }}>
@@ -1232,6 +1297,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
                     <Td>{c.produit}</Td>
                     <Td><button className="askg-btn" onClick={(e) => { ripple(e); setViewCoordId(c.id); }} style={{ ...editBtnStyle, background: "rgba(45,108,223,.12)", color: "#9CC0FF" }}>📇 Voir</button></Td>
                     <Td><button className="askg-btn" onClick={(e) => { ripple(e); setViewConfigId(c.id); }} style={{ ...editBtnStyle, background: "rgba(122,95,199,.12)", color: "#B7A3E8" }}>🏠 Voir</button></Td>
+                    <Td><button className="askg-btn" onClick={(e) => { ripple(e); setViewDocsId(c.id); }} style={{ ...editBtnStyle, background: "rgba(15,169,143,.12)", color: "#0FA98F" }}>📎 {documents.filter(d => d.clientId === c.id).length || ""}</button></Td>
                     <Td>{c.dateRdv ? new Date(c.dateRdv).toLocaleDateString("fr-FR") : "—"}</Td>
                     <Td>
                       <select value={c.statut} onChange={e => updateClient(c.id, { statut: e.target.value })} style={{ ...inputStyle, background: statutInfo(c.statut).bg, color: statutInfo(c.statut).color, fontWeight: 700 }}>
@@ -1268,6 +1334,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient }) {
       </Panel>
       {clientCoord && <AdminCoordonneesModal client={clientCoord} onClose={() => setViewCoordId(null)} onSave={(draft) => updateClient(clientCoord.id, draft)} />}
       {clientConfig && <AdminConfigMaisonModal client={clientConfig} onClose={() => setViewConfigId(null)} onSave={(draft) => updateClient(clientConfig.id, { configurationMaison: JSON.stringify(draft) })} />}
+      {clientDocs && <DocumentsModal client={clientDocs} documents={documents} onUpload={uploadDocument} onDelete={removeDocument} onClose={() => setViewDocsId(null)} />}
     </>
   );
 }
