@@ -1176,7 +1176,7 @@ function fmtUSD(n) { return (n || 0).toLocaleString("fr-FR", { minimumFractionDi
 // ============================================================
 function AdminApp({ agents, clients, clientsSupprimes, codes, donneesRH, setDonneeRH, documents, uploadDocument, removeDocument, setAgentCode, addAgentEntry, removeAgentEntry, updateClient, removeClient, restoreClient, deleteClientForever, onChangePassword, onLogout }) {
   const [page, setPage] = useState("dashboard");
-  const navItems = [["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["corbeille", `Corbeille${clientsSupprimes.length ? ` (${clientsSupprimes.length})` : ""}`], ["agents", "Gestion des agents"], ["donneesrh", "Données RH"], ["codes", "Codes agents"], ["parametres", "Paramètres"]];
+  const navItems = [["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["donneesrh", "Données RH"], ["corbeille", `Corbeille${clientsSupprimes.length ? ` (${clientsSupprimes.length})` : ""}`], ["parametres", "Paramètres"]];
   return (
     <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT_BODY }}>
       <style>{GLOBAL_CSS}</style>
@@ -1200,10 +1200,8 @@ function AdminApp({ agents, clients, clientsSupprimes, codes, donneesRH, setDonn
           {page === "dashboard" && <DashboardPage agents={agents} clients={clients} donneesRH={donneesRH} />}
           {page === "clients" && <TousLesClientsPage agents={agents} clients={clients} updateClient={updateClient} removeClient={removeClient} documents={documents} uploadDocument={uploadDocument} removeDocument={removeDocument} />}
           {page === "corbeille" && <CorbeillePage agents={agents} clientsSupprimes={clientsSupprimes} restoreClient={restoreClient} deleteClientForever={deleteClientForever} />}
-          {page === "agents" && <GestionAgentsPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} />}
           {page === "donneesrh" && <DonneesRHPage agents={agents} donneesRH={donneesRH} setDonneeRH={setDonneeRH} />}
-          {page === "codes" && <CodesAgentsPage agents={agents} codes={codes} setAgentCode={setAgentCode} />}
-          {page === "parametres" && <ParametresPage onChangePassword={onChangePassword} />}
+          {page === "parametres" && <ParametresPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} codes={codes} setAgentCode={setAgentCode} onChangePassword={onChangePassword} />}
         </div>
       </div>
     </div>
@@ -1468,7 +1466,7 @@ function DonneesRHPage({ agents, donneesRH, setDonneeRH }) {
   );
 }
 
-function GestionAgentsPage({ agents, clients, addAgentEntry, removeAgentEntry }) {
+function GestionAgentsPage({ agents, clients, addAgentEntry, removeAgentEntry, embedded }) {
   const [nom, setNom] = useState("");
   const [poste, setPoste] = useState("Agent de téléprospection");
   const [localisation, setLocalisation] = useState("RDC");
@@ -1488,7 +1486,9 @@ function GestionAgentsPage({ agents, clients, addAgentEntry, removeAgentEntry })
 
   return (
     <>
-      <PageHeader title="Gestion des agents" subtitle="Liste partagée avec le Suivi RH — toute modification ici s'applique aussi là-bas" />
+      {embedded
+        ? <div style={{ fontSize: 13.5, fontWeight: 700, color: TEXT, fontFamily: FONT_DISPLAY, margin: "4px 0 12px" }}>👥 Gestion des agents <span style={{ fontWeight: 400, color: TEXT_MUTED, fontSize: 11.5 }}>— liste partagée avec le Suivi RH</span></div>
+        : <PageHeader title="Gestion des agents" subtitle="Liste partagée avec le Suivi RH — toute modification ici s'applique aussi là-bas" />}
       <Panel title="Ajouter un agent" accent>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
           <Field label="Nom complet"><input type="text" value={nom} onChange={e => setNom(e.target.value)} style={{ ...inputStyle, width: 200 }} /></Field>
@@ -1527,7 +1527,7 @@ function GestionAgentsPage({ agents, clients, addAgentEntry, removeAgentEntry })
   );
 }
 
-function CodesAgentsPage({ agents, codes, setAgentCode }) {
+function CodesAgentsPage({ agents, codes, setAgentCode, embedded }) {
   const [edits, setEdits] = useState({});
   function codeActuel(agentId) { const c = codes.find(x => x.agentId === agentId); return c ? c.code : ""; }
   function submit(agentId) {
@@ -1538,7 +1538,9 @@ function CodesAgentsPage({ agents, codes, setAgentCode }) {
   }
   return (
     <>
-      <PageHeader title="Codes d'accès agents" subtitle="Chaque agent utilise ce code (4 chiffres) pour se connecter et voir ses propres clients" />
+      {embedded
+        ? <div style={{ fontSize: 13.5, fontWeight: 700, color: TEXT, fontFamily: FONT_DISPLAY, margin: "20px 0 12px" }}>🔑 Codes d'accès agents <span style={{ fontWeight: 400, color: TEXT_MUTED, fontSize: 11.5 }}>— chaque agent utilise son code (4 chiffres) pour se connecter</span></div>
+        : <PageHeader title="Codes d'accès agents" subtitle="Chaque agent utilise ce code (4 chiffres) pour se connecter et voir ses propres clients" />}
       <Panel title="Tous les agents">
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
           <thead><tr><Th>Agent</Th><Th>Code actuel</Th><Th>Nouveau code</Th><Th></Th></tr></thead>
@@ -1559,7 +1561,7 @@ function CodesAgentsPage({ agents, codes, setAgentCode }) {
   );
 }
 
-function ParametresPage({ onChangePassword }) {
+function ParametresPage({ agents, clients, addAgentEntry, removeAgentEntry, codes, setAgentCode, onChangePassword }) {
   const [oldPw, setOldPw] = useState(""); const [newPw, setNewPw] = useState(""); const [newPw2, setNewPw2] = useState(""); const [msg, setMsg] = useState("");
   async function submit() {
     if (newPw.length < 4) { setMsg("Le nouveau mot de passe doit faire au moins 4 caractères."); return; }
@@ -1570,7 +1572,9 @@ function ParametresPage({ onChangePassword }) {
   }
   return (
     <>
-      <PageHeader title="Paramètres" subtitle="Sécurité de l'accès Direction" />
+      <PageHeader title="Paramètres" subtitle="Agents, codes d'accès et sécurité — tout au même endroit" />
+      <GestionAgentsPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} embedded />
+      <CodesAgentsPage agents={agents} codes={codes} setAgentCode={setAgentCode} embedded />
       <Panel title="Changer le mot de passe Admin">
         <div style={{ maxWidth: 320 }}>
           <label style={labelStyle}>Mot de passe actuel</label>
