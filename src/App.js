@@ -621,7 +621,8 @@ export default function App() {
     if ("qualite" in fullUpdates) dbUpdates.qualite = fullUpdates.qualite;
     if ("documentsDate" in fullUpdates) dbUpdates.documents_date = fullUpdates.documentsDate;
     if ("installeDate" in fullUpdates) dbUpdates.installe_date = fullUpdates.installeDate;
-    await supabase.from("crm_clients").update(dbUpdates).eq("id", id);
+    const { error } = await supabase.from("crm_clients").update(dbUpdates).eq("id", id);
+    if (error) window.alert("⚠️ Erreur d'enregistrement : " + error.message);
   }
   async function removeClient(id) {
     setClients(prev => prev.filter(c => c.id !== id));
