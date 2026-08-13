@@ -578,7 +578,7 @@ export default function App() {
         supabase.from("crm_documents").select("*").order("created_at", { ascending: false }),
       ]);
       if (a.data) setAgents(a.data);
-      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, rappelCommentaire: x.rappel_commentaire, configurationMaison: x.configuration_maison, qualite: x.qualite, documentsDate: x.documents_date, installeDate: x.installe_date })));
+      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, rappelCommentaire: x.rappel_commentaire, configurationMaison: x.configuration_maison, qualite: x.qualite, documentsDate: x.documents_date, installeDate: x.installe_date, supprime: x.supprime })));
       if (cd.data) setCodes(cd.data.map(x => ({ ...x, agentId: x.agent_id })));
       if (pw.data) setAdminStoredPw(pw.data.password);
       else setAdminSetupMode(true);
@@ -625,6 +625,14 @@ export default function App() {
     if (error) window.alert("⚠️ Erreur d'enregistrement : " + error.message);
   }
   async function removeClient(id) {
+    setClients(prev => prev.map(c => c.id === id ? { ...c, supprime: true } : c));
+    await supabase.from("crm_clients").update({ supprime: true }).eq("id", id);
+  }
+  async function restoreClient(id) {
+    setClients(prev => prev.map(c => c.id === id ? { ...c, supprime: false } : c));
+    await supabase.from("crm_clients").update({ supprime: false }).eq("id", id);
+  }
+  async function deleteClientForever(id) {
     setClients(prev => prev.filter(c => c.id !== id));
     await supabase.from("crm_clients").delete().eq("id", id);
   }
@@ -709,10 +717,10 @@ export default function App() {
     return <AdminLoginScreen storedPw={adminStoredPw} onLogin={() => setAdminConnecte(true)} onBack={() => setMode(null)} />;
   }
   if (mode === "agent" && agentConnecte) {
-    return <AgentApp agent={agentConnecte} clients={clients.filter(c => c.agentId === agentConnecte.id)} allClients={clients} agents={agents} donneesRH={donneesRH} addClient={addClient} updateClient={updateClient} onLogout={() => setAgentConnecte(null)} />;
+    return <AgentApp agent={agentConnecte} clients={clients.filter(c => c.agentId === agentConnecte.id && !c.supprime)} allClients={clients.filter(c => !c.supprime)} agents={agents} donneesRH={donneesRH} addClient={addClient} updateClient={updateClient} onLogout={() => setAgentConnecte(null)} />;
   }
   if (mode === "admin" && adminConnecte) {
-    return <AdminApp agents={agents} clients={clients} codes={codes} donneesRH={donneesRH} setDonneeRH={setDonneeRH} documents={documents} uploadDocument={uploadDocument} removeDocument={removeDocument} setAgentCode={setAgentCode} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} updateClient={updateClient} removeClient={removeClient} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
+    return <AdminApp agents={agents} clients={clients.filter(c => !c.supprime)} clientsSupprimes={clients.filter(c => c.supprime)} codes={codes} donneesRH={donneesRH} setDonneeRH={setDonneeRH} documents={documents} uploadDocument={uploadDocument} removeDocument={removeDocument} setAgentCode={setAgentCode} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} updateClient={updateClient} removeClient={removeClient} restoreClient={restoreClient} deleteClientForever={deleteClientForever} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
   }
   return null;
 }
@@ -1166,9 +1174,9 @@ function fmtUSD(n) { return (n || 0).toLocaleString("fr-FR", { minimumFractionDi
 // ============================================================
 // APPLICATION ADMIN
 // ============================================================
-function AdminApp({ agents, clients, codes, donneesRH, setDonneeRH, documents, uploadDocument, removeDocument, setAgentCode, addAgentEntry, removeAgentEntry, updateClient, removeClient, onChangePassword, onLogout }) {
+function AdminApp({ agents, clients, clientsSupprimes, codes, donneesRH, setDonneeRH, documents, uploadDocument, removeDocument, setAgentCode, addAgentEntry, removeAgentEntry, updateClient, removeClient, restoreClient, deleteClientForever, onChangePassword, onLogout }) {
   const [page, setPage] = useState("dashboard");
-  const navItems = [["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["agents", "Gestion des agents"], ["donneesrh", "Données RH"], ["codes", "Codes agents"], ["parametres", "Paramètres"]];
+  const navItems = [["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["corbeille", `Corbeille${clientsSupprimes.length ? ` (${clientsSupprimes.length})` : ""}`], ["agents", "Gestion des agents"], ["donneesrh", "Données RH"], ["codes", "Codes agents"], ["parametres", "Paramètres"]];
   return (
     <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT_BODY }}>
       <style>{GLOBAL_CSS}</style>
@@ -1191,6 +1199,7 @@ function AdminApp({ agents, clients, codes, donneesRH, setDonneeRH, documents, u
         <div key={page} style={{ animation: "askgPageIn 3.5s cubic-bezier(.16,1,.3,1)" }}>
           {page === "dashboard" && <DashboardPage agents={agents} clients={clients} donneesRH={donneesRH} />}
           {page === "clients" && <TousLesClientsPage agents={agents} clients={clients} updateClient={updateClient} removeClient={removeClient} documents={documents} uploadDocument={uploadDocument} removeDocument={removeDocument} />}
+          {page === "corbeille" && <CorbeillePage agents={agents} clientsSupprimes={clientsSupprimes} restoreClient={restoreClient} deleteClientForever={deleteClientForever} />}
           {page === "agents" && <GestionAgentsPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} />}
           {page === "donneesrh" && <DonneesRHPage agents={agents} donneesRH={donneesRH} setDonneeRH={setDonneeRH} />}
           {page === "codes" && <CodesAgentsPage agents={agents} codes={codes} setAgentCode={setAgentCode} />}
@@ -1250,6 +1259,48 @@ function DashboardPage({ agents, clients, donneesRH }) {
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <svg width="60" height="60" viewBox="0 0 60 60" style={{ opacity: .45, animation: "askgFloaty 4s ease-in-out infinite" }}><rect x="8" y="16" width="30" height="22" rx="4" fill="none" stroke={SIGNAL} strokeWidth="3" /><circle cx="23" cy="27" r="8" fill="none" stroke={SIGNAL} strokeWidth="2.4" /><path d="M23 21 Q27 27 23 33 Q19 27 23 21" fill={SIGNAL} /><line x1="42" y1="27" x2="54" y2="27" stroke={SIGNAL} strokeWidth="3" strokeLinecap="round" /></svg>
       </div>
+    </>
+  );
+}
+
+// ============================================================
+// CORBEILLE — clients supprimés, restaurables ou effaçables définitivement
+// ============================================================
+function CorbeillePage({ agents, clientsSupprimes, restoreClient, deleteClientForever }) {
+  function nomAgent(id) { const a = agents.find(x => x.id === id); return a ? a.nom : "?"; }
+  function supprimerDefinitivement(c) {
+    if (window.confirm(`Supprimer DÉFINITIVEMENT la fiche de ${c.nomClient} ? Cette action est irréversible, impossible de revenir en arrière ensuite.`)) {
+      deleteClientForever(c.id);
+    }
+  }
+  return (
+    <>
+      <PageHeader title="Corbeille" subtitle="Clients supprimés — restaurables à tout moment tant qu'ils sont ici" />
+      <Panel title={`Clients supprimés (${clientsSupprimes.length})`}>
+        {clientsSupprimes.length === 0 ? <EmptyState text="La corbeille est vide." /> : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+              <thead><tr><Th>Client</Th><Th>Agent</Th><Th>Téléphone</Th><Th>Statut au moment de la suppression</Th><Th></Th></tr></thead>
+              <tbody>
+                {clientsSupprimes.map(c => (
+                  <tr key={c.id} className="askg-tbl-row" style={{ transition: "background .2s ease" }}>
+                    <Td><b>{c.nomClient}</b></Td>
+                    <Td>{nomAgent(c.agentId)}</Td>
+                    <Td style={{ fontFamily: FONT_MONO }}>{c.telephone}</Td>
+                    <Td><StatutBadge value={c.statut} /></Td>
+                    <Td>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button className="askg-btn" onClick={(e) => { ripple(e); restoreClient(c.id); }} style={{ ...editBtnStyle, background: "rgba(15,169,143,.14)", color: "#0FA98F" }}>↩ Restaurer</button>
+                        <button className="askg-btn" onClick={(e) => { ripple(e); supprimerDefinitivement(c); }} style={delBtnStyle}>Supprimer définitivement</button>
+                      </div>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
     </>
   );
 }
@@ -1326,7 +1377,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient, docum
                       {c.statut !== "rappeler" && c.statut !== "annule" && <span style={{ color: TEXT_MUTED }}>—</span>}
                     </Td>
                     <Td style={{ maxWidth: 160 }}>{c.notes}</Td>
-                    <Td><button className="askg-btn" onClick={(e) => { ripple(e); removeClient(c.id); }} style={delBtnStyle}>Suppr.</button></Td>
+                    <Td><button className="askg-btn" onClick={(e) => { ripple(e); if (window.confirm(`Déplacer la fiche de ${c.nomClient} vers la Corbeille ? Tu pourras la restaurer à tout moment depuis "Corbeille".`)) removeClient(c.id); }} style={delBtnStyle}>Suppr.</button></Td>
                   </tr>
                 ))}
               </tbody>
