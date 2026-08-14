@@ -11,6 +11,40 @@ const SUPABASE_URL = "https://sfuuzluaysxrdcqtvuto.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmdXV6bHVheXN4cmRjcXR2dXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwMTU2OTEsImV4cCI6MjA5NzU5MTY5MX0.2N6_dYs56LLV6hLLkxippeyxrMNSp9VlBUt_GUdEdcM";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ─── Notifications push (fonctionnent même app fermée) ─────────
+const VAPID_PUBLIC_KEY = "BKFowL3Moaep2DkM54O0ZtwitfxIfe940aDxxdPMuX4R8gk8oI2ko6uc9iqR1C1X2vK4YfQE0mVW2ZTZI64OLNQ";
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+async function activerNotifications() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    window.alert("Les notifications ne sont pas prises en charge sur ce navigateur/appareil.");
+    return false;
+  }
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    window.alert("Permission refusée — active les notifications dans les réglages du navigateur pour ce site.");
+    return false;
+  }
+  const reg = await navigator.serviceWorker.register("/sw.js");
+  await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+  });
+  const json = sub.toJSON();
+  await supabase.from("crm_push_subscriptions").insert({
+    id: uid(),
+    endpoint: json.endpoint,
+    p256dh: json.keys.p256dh,
+    auth: json.keys.auth,
+  });
+  return true;
+}
+
 // ─── Tokens de design ────────────────────────────────────────
 const BG = "#0B0D12";
 const SURFACE = "#1D2029";
@@ -1563,6 +1597,12 @@ function CodesAgentsPage({ agents, codes, setAgentCode, embedded }) {
 
 function ParametresPage({ agents, clients, addAgentEntry, removeAgentEntry, codes, setAgentCode, onChangePassword }) {
   const [oldPw, setOldPw] = useState(""); const [newPw, setNewPw] = useState(""); const [newPw2, setNewPw2] = useState(""); const [msg, setMsg] = useState("");
+  const [notifStatus, setNotifStatus] = useState("idle"); // idle | activation | actif | erreur
+  async function activer() {
+    setNotifStatus("activation");
+    const ok = await activerNotifications();
+    setNotifStatus(ok ? "actif" : "idle");
+  }
   async function submit() {
     if (newPw.length < 4) { setMsg("Le nouveau mot de passe doit faire au moins 4 caractères."); return; }
     if (newPw !== newPw2) { setMsg("Les deux nouveaux mots de passe ne correspondent pas."); return; }
@@ -1573,6 +1613,12 @@ function ParametresPage({ agents, clients, addAgentEntry, removeAgentEntry, code
   return (
     <>
       <PageHeader title="Paramètres" subtitle="Agents, codes d'accès et sécurité — tout au même endroit" />
+      <Panel title="🔔 Notifications de nouveaux rendez-vous" accent>
+        <div style={{ fontSize: 12.5, color: TEXT_MUTED, marginBottom: 14 }}>Active les notifications sur cet appareil (téléphone ou ordinateur) pour être alerté dès qu'un agent ajoute un nouveau rendez-vous — même quand Kate est fermé. À faire une fois par appareil.</div>
+        <button className="askg-btn" onClick={(e) => { ripple(e); activer(); }} disabled={notifStatus === "activation" || notifStatus === "actif"} style={{ ...primaryBtnStyle, opacity: notifStatus === "activation" ? .6 : 1 }}>
+          {notifStatus === "actif" ? "✓ Notifications activées sur cet appareil" : notifStatus === "activation" ? "Activation en cours…" : "Activer les notifications"}
+        </button>
+      </Panel>
       <GestionAgentsPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} embedded />
       <CodesAgentsPage agents={agents} codes={codes} setAgentCode={setAgentCode} embedded />
       <Panel title="Changer le mot de passe Admin">
