@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 // ============================================================
@@ -522,8 +522,27 @@ function formatTaille(bytes) {
 }
 
 // Documents clients — visible et gérable uniquement depuis l'accès Direction
+// Visionneuse intégrée — affiche la photo ou le PDF directement dans Kate,
+// sans jamais ouvrir un onglet de navigateur externe
+function DocumentViewerModal({ doc, url, onClose }) {
+  const estImage = doc.typeFichier && doc.typeFichier.startsWith("image/");
+  return (
+    <Modal title={`${estImage ? "🖼️" : "📄"} ${doc.nomFichier}`} onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {estImage ? (
+          <img src={url} alt={doc.nomFichier} style={{ width: "100%", maxHeight: "72vh", objectFit: "contain", borderRadius: 10, background: "#000" }} />
+        ) : (
+          <iframe src={url} title={doc.nomFichier} style={{ width: "100%", height: "72vh", border: "none", borderRadius: 10, background: "#fff" }} />
+        )}
+        <a href={url} download={doc.nomFichier} style={{ ...ghostBtnStyle, textAlign: "center", textDecoration: "none", display: "block" }}>⬇ Télécharger sur cet appareil</a>
+      </div>
+    </Modal>
+  );
+}
+
 function DocumentsModal({ client, documents, onUpload, onDelete, onClose }) {
   const [uploading, setUploading] = useState(false);
+  const [viewing, setViewing] = useState(null);
   const docsClient = documents.filter(d => d.clientId === client.id);
 
   async function handleFiles(e) {
@@ -547,16 +566,17 @@ function DocumentsModal({ client, documents, onUpload, onDelete, onClose }) {
             const url = supabase.storage.from("crm-documents").getPublicUrl(d.cheminStockage).data.publicUrl;
             return (
               <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: "#12141A", border: `1px solid ${LINE}`, borderRadius: 10, padding: "10px 14px" }}>
-                <a href={url} target="_blank" rel="noreferrer" style={{ color: "#9CC0FF", fontSize: 12.5, textDecoration: "none", wordBreak: "break-all", flex: 1 }}>
+                <button onClick={() => setViewing({ doc: d, url })} style={{ background: "none", border: "none", cursor: "pointer", color: "#9CC0FF", fontSize: 12.5, textAlign: "left", wordBreak: "break-all", flex: 1, padding: 0, fontFamily: "inherit" }}>
                   {d.typeFichier && d.typeFichier.startsWith("image/") ? "🖼️" : "📄"} {d.nomFichier}
                   <div style={{ fontSize: 10, color: TEXT_MUTED, marginTop: 2 }}>{formatTaille(d.taille)} · {new Date(d.created_at).toLocaleDateString("fr-FR")}</div>
-                </a>
+                </button>
                 <button className="askg-btn" onClick={(e) => { ripple(e); onDelete(d); }} style={delBtnStyle}>Suppr.</button>
               </div>
             );
           })}
         </div>
       )}
+      {viewing && <DocumentViewerModal doc={viewing.doc} url={viewing.url} onClose={() => setViewing(null)} />}
     </Modal>
   );
 }
@@ -612,7 +632,7 @@ export default function App() {
         supabase.from("crm_documents").select("*").order("created_at", { ascending: false }),
       ]);
       if (a.data) setAgents(a.data);
-      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, rappelCommentaire: x.rappel_commentaire, configurationMaison: x.configuration_maison, qualite: x.qualite, documentsDate: x.documents_date, installeDate: x.installe_date, supprime: x.supprime })));
+      if (c.data) setClients(c.data.map(x => ({ ...x, agentId: x.agent_id, nomClient: x.nom_client, dateRdv: x.date_rdv, raisonAnnulation: x.raison_annulation, rappelDate: x.rappel_date, rappelCommentaire: x.rappel_commentaire, configurationMaison: x.configuration_maison, qualite: x.qualite, documentsDate: x.documents_date, installeDate: x.installe_date, supprime: x.supprime, audioPath: x.audio_path })));
       if (cd.data) setCodes(cd.data.map(x => ({ ...x, agentId: x.agent_id })));
       if (pw.data) setAdminStoredPw(pw.data.password);
       else setAdminSetupMode(true);
@@ -655,20 +675,24 @@ export default function App() {
     if ("qualite" in fullUpdates) dbUpdates.qualite = fullUpdates.qualite;
     if ("documentsDate" in fullUpdates) dbUpdates.documents_date = fullUpdates.documentsDate;
     if ("installeDate" in fullUpdates) dbUpdates.installe_date = fullUpdates.installeDate;
+    if ("audioPath" in fullUpdates) dbUpdates.audio_path = fullUpdates.audioPath;
     const { error } = await supabase.from("crm_clients").update(dbUpdates).eq("id", id);
     if (error) window.alert("⚠️ Erreur d'enregistrement : " + error.message);
   }
   async function removeClient(id) {
     setClients(prev => prev.map(c => c.id === id ? { ...c, supprime: true } : c));
-    await supabase.from("crm_clients").update({ supprime: true }).eq("id", id);
+    const { error } = await supabase.from("crm_clients").update({ supprime: true }).eq("id", id);
+    if (error) window.alert("⚠️ Erreur d'enregistrement (suppression) : " + error.message);
   }
   async function restoreClient(id) {
     setClients(prev => prev.map(c => c.id === id ? { ...c, supprime: false } : c));
-    await supabase.from("crm_clients").update({ supprime: false }).eq("id", id);
+    const { error } = await supabase.from("crm_clients").update({ supprime: false }).eq("id", id);
+    if (error) window.alert("⚠️ Erreur d'enregistrement (restauration) : " + error.message);
   }
   async function deleteClientForever(id) {
     setClients(prev => prev.filter(c => c.id !== id));
-    await supabase.from("crm_clients").delete().eq("id", id);
+    const { error } = await supabase.from("crm_clients").delete().eq("id", id);
+    if (error) window.alert("⚠️ Erreur d'enregistrement (suppression définitive) : " + error.message);
   }
   async function setAgentCode(agentId, code) {
     const existing = codes.find(c => c.agentId === agentId);
@@ -709,6 +733,20 @@ export default function App() {
     await supabase.storage.from("crm-documents").remove([doc.cheminStockage]);
     await supabase.from("crm_documents").delete().eq("id", doc.id);
     setDocuments(prev => prev.filter(d => d.id !== doc.id));
+  }
+  async function uploadAudio(clientId, file) {
+    if (file.size > 30 * 1024 * 1024) { window.alert("Fichier trop volumineux (30 Mo max)."); return; }
+    const current = clients.find(c => c.id === clientId);
+    if (current?.audioPath) await supabase.storage.from("crm-documents").remove([current.audioPath]);
+    const path = `audio/${clientId}/${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from("crm-documents").upload(path, file);
+    if (error) { window.alert("Erreur lors de l'envoi : " + error.message); return; }
+    await updateClient(clientId, { audioPath: path });
+  }
+  async function removeAudio(clientId) {
+    const current = clients.find(c => c.id === clientId);
+    if (current?.audioPath) await supabase.storage.from("crm-documents").remove([current.audioPath]);
+    await updateClient(clientId, { audioPath: null });
   }
   async function handleAdminSetup(pw) {
     await supabase.from("app_passwords").insert({ app_name: APP_NAME_ADMIN, password: pw });
@@ -754,7 +792,7 @@ export default function App() {
     return <AgentApp agent={agentConnecte} clients={clients.filter(c => c.agentId === agentConnecte.id && !c.supprime)} allClients={clients.filter(c => !c.supprime)} agents={agents} donneesRH={donneesRH} addClient={addClient} updateClient={updateClient} onLogout={() => setAgentConnecte(null)} />;
   }
   if (mode === "admin" && adminConnecte) {
-    return <AdminApp agents={agents} clients={clients.filter(c => !c.supprime)} clientsSupprimes={clients.filter(c => c.supprime)} codes={codes} donneesRH={donneesRH} setDonneeRH={setDonneeRH} documents={documents} uploadDocument={uploadDocument} removeDocument={removeDocument} setAgentCode={setAgentCode} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} updateClient={updateClient} removeClient={removeClient} restoreClient={restoreClient} deleteClientForever={deleteClientForever} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
+    return <AdminApp agents={agents} clients={clients.filter(c => !c.supprime)} clientsSupprimes={clients.filter(c => c.supprime)} codes={codes} donneesRH={donneesRH} setDonneeRH={setDonneeRH} documents={documents} uploadDocument={uploadDocument} removeDocument={removeDocument} uploadAudio={uploadAudio} removeAudio={removeAudio} setAgentCode={setAgentCode} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} updateClient={updateClient} removeClient={removeClient} restoreClient={restoreClient} deleteClientForever={deleteClientForever} onChangePassword={handleChangeAdminPassword} onLogout={() => setAdminConnecte(false)} />;
   }
   return null;
 }
@@ -1208,7 +1246,7 @@ function fmtUSD(n) { return (n || 0).toLocaleString("fr-FR", { minimumFractionDi
 // ============================================================
 // APPLICATION ADMIN
 // ============================================================
-function AdminApp({ agents, clients, clientsSupprimes, codes, donneesRH, setDonneeRH, documents, uploadDocument, removeDocument, setAgentCode, addAgentEntry, removeAgentEntry, updateClient, removeClient, restoreClient, deleteClientForever, onChangePassword, onLogout }) {
+function AdminApp({ agents, clients, clientsSupprimes, codes, donneesRH, setDonneeRH, documents, uploadDocument, removeDocument, uploadAudio, removeAudio, setAgentCode, addAgentEntry, removeAgentEntry, updateClient, removeClient, restoreClient, deleteClientForever, onChangePassword, onLogout }) {
   const [page, setPage] = useState("dashboard");
   const navItems = [["dashboard", "Tableau de bord"], ["clients", "Tous les clients"], ["donneesrh", "Données RH"], ["corbeille", `Corbeille${clientsSupprimes.length ? ` (${clientsSupprimes.length})` : ""}`], ["parametres", "Paramètres"]];
   return (
@@ -1232,7 +1270,7 @@ function AdminApp({ agents, clients, clientsSupprimes, codes, donneesRH, setDonn
       <div style={{ padding: "24px 28px", maxWidth: 1300, margin: "0 auto", overflowX: "auto" }}>
         <div key={page} style={{ animation: "askgPageIn 3.5s cubic-bezier(.16,1,.3,1)" }}>
           {page === "dashboard" && <DashboardPage agents={agents} clients={clients} donneesRH={donneesRH} />}
-          {page === "clients" && <TousLesClientsPage agents={agents} clients={clients} updateClient={updateClient} removeClient={removeClient} documents={documents} uploadDocument={uploadDocument} removeDocument={removeDocument} />}
+          {page === "clients" && <TousLesClientsPage agents={agents} clients={clients} updateClient={updateClient} removeClient={removeClient} documents={documents} uploadDocument={uploadDocument} removeDocument={removeDocument} uploadAudio={uploadAudio} removeAudio={removeAudio} />}
           {page === "corbeille" && <CorbeillePage agents={agents} clientsSupprimes={clientsSupprimes} restoreClient={restoreClient} deleteClientForever={deleteClientForever} />}
           {page === "donneesrh" && <DonneesRHPage agents={agents} donneesRH={donneesRH} setDonneeRH={setDonneeRH} />}
           {page === "parametres" && <ParametresPage agents={agents} clients={clients} addAgentEntry={addAgentEntry} removeAgentEntry={removeAgentEntry} codes={codes} setAgentCode={setAgentCode} onChangePassword={onChangePassword} />}
@@ -1337,7 +1375,67 @@ function CorbeillePage({ agents, clientsSupprimes, restoreClient, deleteClientFo
   );
 }
 
-function TousLesClientsPage({ agents, clients, updateClient, removeClient, documents, uploadDocument, removeDocument }) {
+// Lecteur audio compact — vitesse réglable façon WhatsApp (1x → 1.5x → 2x → 0.5x → 1x)
+const VITESSES = [1, 1.5, 2, 0.5];
+function LecteurAudio({ url }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [vitesseIdx, setVitesseIdx] = useState(0);
+
+  function togglePlay() {
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) a.pause();
+    else a.play();
+  }
+  function cyclerVitesse() {
+    const next = (vitesseIdx + 1) % VITESSES.length;
+    setVitesseIdx(next);
+    if (audioRef.current) audioRef.current.playbackRate = VITESSES[next];
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <audio ref={audioRef} src={url} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => setPlaying(false)} style={{ display: "none" }} />
+      <button className="askg-btn" onClick={(e) => { ripple(e); togglePlay(); }} style={{ width: 28, height: 28, borderRadius: 99, border: "none", background: "rgba(15,169,143,.16)", color: "#0FA98F", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {playing ? "⏸" : "▶"}
+      </button>
+      <button className="askg-btn" onClick={(e) => { ripple(e); cyclerVitesse(); }} style={{ padding: "3px 8px", borderRadius: 99, border: `1px solid ${LINE}`, background: "rgba(255,255,255,.05)", color: TEXT_MUTED, cursor: "pointer", fontSize: 10.5, fontWeight: 700, flexShrink: 0 }}>
+        {VITESSES[vitesseIdx]}x
+      </button>
+    </div>
+  );
+}
+
+// Cellule "Audio de l'appel" — bouton d'envoi si vide, lecteur + suppr. si présent
+function AudioCell({ client, uploadAudio, removeAudio }) {
+  const [uploading, setUploading] = useState(false);
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    await uploadAudio(client.id, file);
+    setUploading(false);
+    e.target.value = "";
+  }
+  if (!client.audioPath) {
+    return (
+      <label style={{ ...editBtnStyle, background: "rgba(122,95,199,.12)", color: "#B7A3E8", display: "inline-flex", alignItems: "center", cursor: uploading ? "default" : "pointer", opacity: uploading ? .6 : 1 }}>
+        {uploading ? "Envoi…" : "🎙️ Ajouter"}
+        <input type="file" accept="audio/*" onChange={handleFile} disabled={uploading} style={{ display: "none" }} />
+      </label>
+    );
+  }
+  const url = supabase.storage.from("crm-documents").getPublicUrl(client.audioPath).data.publicUrl;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <LecteurAudio url={url} />
+      <button className="askg-btn" onClick={(e) => { ripple(e); if (window.confirm("Supprimer cet enregistrement audio ?")) removeAudio(client.id); }} style={{ ...delBtnStyle, padding: "3px 7px", fontSize: 10.5 }}>✕</button>
+    </div>
+  );
+}
+
+function TousLesClientsPage({ agents, clients, updateClient, removeClient, documents, uploadDocument, removeDocument, uploadAudio, removeAudio }) {
   const [filtreAgent, setFiltreAgent] = useState("tous");
   const [filtreStatut, setFiltreStatut] = useState("tous");
   const [viewCoordId, setViewCoordId] = useState(null);
@@ -1372,7 +1470,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient, docum
         {filtres.length === 0 ? <EmptyState text="Aucun client ne correspond à ces filtres." /> : (
           <div style={{ overflowX: "auto" }}>
             <table className="askg-tbl" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
-              <thead><tr><Th>Agent</Th><Th>Client</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Coordonnées</Th><Th>Config. maison</Th><Th>Documents</Th><Th>Date RDV</Th><Th>Statut</Th><Th>Qualité</Th><Th>Détails (rappel / raison)</Th><Th>Notes</Th><Th></Th></tr></thead>
+              <thead><tr><Th>Agent</Th><Th>Client</Th><Th>Téléphone</Th><Th>Produit</Th><Th>Coordonnées</Th><Th>Config. maison</Th><Th>Documents</Th><Th>Date RDV</Th><Th>Statut</Th><Th>Audio de l'appel</Th><Th>Qualité</Th><Th>Détails (rappel / raison)</Th><Th>Notes</Th><Th></Th></tr></thead>
               <tbody>
                 {filtres.map((c, i) => (
                   <tr key={c.id} className="askg-tbl-row" style={{ transition: "background .2s ease", animation: "askgRowIn .4s ease forwards", animationDelay: Math.min(i * .04, .3) + "s", opacity: 0 }}>
@@ -1389,6 +1487,7 @@ function TousLesClientsPage({ agents, clients, updateClient, removeClient, docum
                         {STATUTS.map(s => <option key={s.key} value={s.key} style={{ background: SURFACE, color: TEXT }}>{s.label}</option>)}
                       </select>
                     </Td>
+                    <Td><AudioCell client={c} uploadAudio={uploadAudio} removeAudio={removeAudio} /></Td>
                     <Td>
                       <select value={c.qualite || ""} onChange={e => updateClient(c.id, { qualite: e.target.value })} style={{ ...inputStyle, width: 130, fontWeight: 700, background: c.qualite === "valide" ? "rgba(15,169,143,.14)" : c.qualite === "non_valide" ? "rgba(196,61,70,.14)" : "rgba(255,255,255,.06)", color: c.qualite === "valide" ? "#0FA98F" : c.qualite === "non_valide" ? "#E0656B" : TEXT_MUTED }}>
                         <option value="" style={{ background: SURFACE, color: TEXT }}>Non jugé</option>
